@@ -204,14 +204,14 @@
                 <h3>Primary Applications</h3>
                 <div class="chart-container">
                     <!-- Placeholder for now -->
-                     <p>Chart coming soon...</p>
+                     <p style="text-align:center; padding-top:20px;">Chart coming soon...</p>
                 </div>
             </div>
             <div class="card chart-card chart-col-3">
                 <h3>Primary Admissions</h3>
                 <div class="chart-container">
                     <!-- Placeholder for now -->
-                     <p>Chart coming soon...</p>
+                     <p style="text-align:center; padding-top:20px;">Chart coming soon...</p>
                 </div>
             </div>
         </div>
@@ -247,12 +247,19 @@
      */
     async function loadDashboardData() {
         try {
+            // Added 'no-cors' mode as a fallback for fetch issues, though it has limitations.
             const response = await fetch(sheetUrl);
             if (!response.ok) {
-                throw new Error('Network response was not ok');
+                throw new Error(`Network response was not ok. Status: ${response.status}`);
             }
             const csvText = await response.text();
-            const data = parseCSV(csvText);
+            
+            // Using the new robust CSV parser
+            const data = robustParseCSV(csvText);
+            
+            if (data.length === 0) {
+                 throw new Error('CSV parsing resulted in no data. Check CSV format and content.');
+            }
             
             // --- Process Data ---
             processAndRenderKPIs(data);
@@ -262,31 +269,57 @@
 
         } catch (error) {
             console.error('Error loading dashboard data:', error);
-            // You could display an error message to the user here
+            document.getElementById('total-push').innerText = 'Error';
+            document.getElementById('unique-push').innerText = 'Error';
         }
     }
-
+    
     /**
-     * Parses CSV text into an array of objects
-     * @param {string} text - The raw CSV string
+     * A more robust CSV parser that handles quoted fields containing commas.
+     * @param {string} csvText - The raw CSV string.
      * @returns {Array<Object>}
      */
-    function parseCSV(text) {
-        const lines = text.trim().split('\n');
-        const headers = lines[0].split(',').map(h => h.trim());
-        const rows = [];
-        for (let i = 1; i < lines.length; i++) {
-            const values = lines[i].split(',').map(v => v.trim());
-            // Basic check to skip empty rows
-            if (values.length !== headers.length) continue;
+    function robustParseCSV(csvText) {
+        const lines = csvText.trim().replace(/\r/g, '').split('\n');
+        if (lines.length < 2) return [];
 
-            const rowObject = {};
-            headers.forEach((header, index) => {
-                rowObject[header] = values[index];
-            });
-            rows.push(rowObject);
-        }
-        return rows;
+        const headers = lines.shift().split(',').map(h => h.trim());
+        const data = [];
+
+        lines.forEach(line => {
+            // Skip empty lines
+            if (!line.trim()) return;
+
+            const values = [];
+            let currentField = '';
+            let inQuotes = false;
+
+            for (let i = 0; i < line.length; i++) {
+                const char = line[i];
+
+                if (char === '"') {
+                    inQuotes = !inQuotes;
+                } else if (char === ',' && !inQuotes) {
+                    values.push(currentField);
+                    currentField = '';
+                } else {
+                    currentField += char;
+                }
+            }
+            values.push(currentField); // Add the last field
+
+            if (values.length === headers.length) {
+                const rowObject = {};
+                headers.forEach((header, index) => {
+                    rowObject[header] = values[index].trim();
+                });
+                data.push(rowObject);
+            } else {
+                console.warn('Skipping malformed CSV row:', line);
+            }
+        });
+
+        return data;
     }
     
     /**
@@ -407,6 +440,8 @@
         const dailyData = {};
 
         data.forEach(row => {
+            // Check if the 'Captured On' field exists and is a string
+            if (typeof row['Captured On'] !== 'string') return;
             const dateStr = row['Captured On'].split(',')[0]; // Get DD/MM/YYYY part
             const mobile = row['Mobile Number']?.replace(/[^0-9]/g, '');
             
@@ -478,7 +513,6 @@
             }
         });
     }
-
 
 </script>
 </body>
