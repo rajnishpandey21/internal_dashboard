@@ -238,7 +238,7 @@
     const sheet1Url = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ-8syL70s-kwK8VPPf3HrwRDgtUNWDAwIz3s23uWQgkJa81bUnk9a4xSF2g9sYfYq7GJm8PQsGt68g/pub?gid=0&single=true&output=csv';
     
     // --- IMPORTANT! PASTE YOUR URL FOR SHEET 2 HERE ---
-    const sheet2Url = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ-8syL70s-kwK8VPPf3HrwRDgtUNWDAwIz3s23uWQgkJa81bUnk9a4xSF2g9sYfYq7GJm8PQsGt68g/pub?gid=1166157628&single=true&output=csv'; 
+    const sheet2Url = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ-8syL70s-kwK8VPPf3HrwRDgtUNWDAwIz3s23uWQgkJa81bUnk9a4xSF2g9sYfYq7GJm8PQsGt68g/pub?gid=1166157628&single=true&output=csv''; 
 
     document.addEventListener('DOMContentLoaded', () => {
         loadDashboardData();
@@ -255,10 +255,13 @@
             ];
 
             // Check if the user has replaced the placeholder URL for sheet 2
-            if (sheet2Url && sheet2Url !== 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ-8syL70s-kwK8VPPf3HrwRDgtUNWDAwIz3s23uWQgkJa81bUnk9a4xSF2g9sYfYq7GJm8PQsGt68g/pub?gid=1166157628&single=true&output=csv') {
+            if (sheet2Url && sheet2Url !== 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ-8syL70s-kwK8VPPf3HrwRDgtUNWDAwIz3s23uWQgkJa81bUnk9a4xSF2g9sYfYq7GJm8PQsGt68g/pub?gid=1166157628&single=true&output=csv'') {
                 fetchPromises.push(
                     fetch(sheet2Url).then(res => res.ok ? res.text() : Promise.reject(`Sheet2 fetch failed: ${res.status}`))
                 );
+            } else {
+                // Add a clear warning if the Sheet2 URL is still the placeholder
+                console.warn("Sheet2 data is not being loaded. Please paste the published CSV URL for Sheet2 into the 'sheet2Url' variable in the script.");
             }
 
             // Wait for all fetches to complete
@@ -316,6 +319,7 @@
             }
             values.push(currentField);
 
+            // This check is crucial. It ensures we only process rows that have the correct number of columns.
             if (values.length === headers.length) {
                 const rowObject = {};
                 headers.forEach((header, index) => {
@@ -323,7 +327,7 @@
                 });
                 data.push(rowObject);
             } else {
-                 console.warn('Skipping malformed CSV row:', line);
+                 console.warn(`Skipping malformed CSV row (expected ${headers.length} columns, but got ${values.length}):`, line);
             }
         });
         return data;
