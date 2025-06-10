@@ -238,7 +238,7 @@
     const sheet1Url = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ-8syL70s-kwK8VPPf3HrwRDgtUNWDAwIz3s23uWQgkJa81bUnk9a4xSF2g9sYfYq7GJm8PQsGt68g/pub?gid=0&single=true&output=csv';
     
     // --- IMPORTANT! PASTE YOUR URL FOR SHEET 2 HERE ---
-    const sheet2Url = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ-8syL70s-kwK8VPPf3HrwRDgtUNWDAwIz3s23uWQgkJa81bUnk9a4xSF2g9sYfYq7GJm8PQsGt68g/pub?gid=1166157628&single=true&output=csv''; 
+    const sheet2Url = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ-8syL70s-kwK8VPPf3HrwRDgtUNWDAwIz3s23uWQgkJa81bUnk9a4xSF2g9sYfYq7GJm8PQsGt68g/pub?gid=1166157628&single=true&output=csv'; 
 
     document.addEventListener('DOMContentLoaded', () => {
         loadDashboardData();
@@ -255,7 +255,7 @@
             ];
 
             // Check if the user has replaced the placeholder URL for sheet 2
-            if (sheet2Url && sheet2Url !== 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ-8syL70s-kwK8VPPf3HrwRDgtUNWDAwIz3s23uWQgkJa81bUnk9a4xSF2g9sYfYq7GJm8PQsGt68g/pub?gid=1166157628&single=true&output=csv'') {
+            if (sheet2Url && sheet2Url !== 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ-8syL70s-kwK8VPPf3HrwRDgtUNWDAwIz3s23uWQgkJa81bUnk9a4xSF2g9sYfYq7GJm8PQsGt68g/pub?gid=1166157628&single=true&output=csv') {
                 fetchPromises.push(
                     fetch(sheet2Url).then(res => res.ok ? res.text() : Promise.reject(`Sheet2 fetch failed: ${res.status}`))
                 );
