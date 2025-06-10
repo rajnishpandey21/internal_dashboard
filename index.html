@@ -236,10 +236,9 @@
 <script>
     // URLs for the published Google Sheets
     const sheet1Url = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ-8syL70s-kwK8VPPf3HrwRDgtUNWDAwIz3s23uWQgkJa81bUnk9a4xSF2g9sYfYq7GJm8PQsGt68g/pub?gid=0&single=true&output=csv';
-    
-    // --- IMPORTANT! PASTE YOUR URL FOR SHEET 2 HERE ---
-    const sheet2Url = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ-8syL70s-kwK8VPPf3HrwRDgtUNWDAwIz3s23uWQgkJa81bUnk9a4xSF2g9sYfYq7GJm8PQsGt68g/pub?gid=1166157628&single=true&output=csv'; 
+    const sheet2Url = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ-8syL70s-kwK8VPPf3HrwRDgtUNWDAwIz3s23uWQgkJa81bUnk9a4xSF2g9sYfYq7GJm8PQsGt68g/pub?gid=1166157628&single=true&output=csv';
 
+    // This function runs when the page is loaded
     document.addEventListener('DOMContentLoaded', () => {
         loadDashboardData();
     });
@@ -249,26 +248,25 @@
      */
     async function loadDashboardData() {
         try {
-            // Create an array to hold fetch promises
-            const fetchPromises = [
-                fetch(sheet1Url).then(res => res.ok ? res.text() : Promise.reject(`Sheet1 fetch failed: ${res.status}`))
-            ];
+            // Create promises to fetch data from both sheets simultaneously
+            const fetchSheet1 = fetch(sheet1Url).then(res => {
+                if (!res.ok) return Promise.reject(`Sheet1 fetch failed: ${res.status}`);
+                return res.text();
+            });
+            const fetchSheet2 = fetch(sheet2Url).then(res => {
+                if (!res.ok) return Promise.reject(`Sheet2 fetch failed: ${res.status}`);
+                return res.text();
+            });
 
-            // Check if the user has replaced the placeholder URL for sheet 2
-            if (sheet2Url && sheet2Url !== 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ-8syL70s-kwK8VPPf3HrwRDgtUNWDAwIz3s23uWQgkJa81bUnk9a4xSF2g9sYfYq7GJm8PQsGt68g/pub?gid=1166157628&single=true&output=csv') {
-                fetchPromises.push(
-                    fetch(sheet2Url).then(res => res.ok ? res.text() : Promise.reject(`Sheet2 fetch failed: ${res.status}`))
-                );
-            } else {
-                // Add a clear warning if the Sheet2 URL is still the placeholder
-                console.warn("Sheet2 data is not being loaded. Please paste the published CSV URL for Sheet2 into the 'sheet2Url' variable in the script.");
-            }
+            // Wait for both fetches to complete
+            const [csvText1, csvText2] = await Promise.all([fetchSheet1, fetchSheet2]);
 
-            // Wait for all fetches to complete
-            const csvResults = await Promise.all(fetchPromises);
-
-            // Parse the CSV text from all fetched sheets and combine the data
-            const combinedData = csvResults.flatMap(csvText => robustParseCSV(csvText));
+            // Parse the CSV text from both sheets
+            const data1 = robustParseCSV(csvText1);
+            const data2 = robustParseCSV(csvText2);
+            
+            // Combine the data into a single array
+            const combinedData = [...data1, ...data2];
             
             if (combinedData.length === 0) {
                  throw new Error('CSV parsing resulted in no data. Check CSV format and URLs.');
@@ -289,13 +287,15 @@
     
     /**
      * A robust CSV parser that handles quoted fields containing commas.
+     * @param {string} csvText - The raw CSV string.
+     * @returns {Array<Object>}
      */
     function robustParseCSV(csvText) {
         if (!csvText) return [];
         const lines = csvText.trim().replace(/\r/g, '').split('\n');
         if (lines.length < 2) return [];
 
-        // Use the first line of each file as headers, assuming they are the same
+        // Use the first line of each file as headers
         const headers = lines.shift().split(',').map(h => h.trim());
         const data = [];
 
@@ -308,7 +308,7 @@
 
             for (let i = 0; i < line.length; i++) {
                 const char = line[i];
-                if (char === '"' && (i === 0 || line[i-1] !== '\\')) { // Handles escaped quotes if any
+                if (char === '"' && (i === 0 || line[i-1] !== '\\')) {
                     inQuotes = !inQuotes;
                 } else if (char === ',' && !inQuotes) {
                     values.push(currentField);
@@ -319,7 +319,6 @@
             }
             values.push(currentField);
 
-            // This check is crucial. It ensures we only process rows that have the correct number of columns.
             if (values.length === headers.length) {
                 const rowObject = {};
                 headers.forEach((header, index) => {
@@ -333,9 +332,10 @@
         return data;
     }
     
-    // --- The following functions are for processing and rendering the charts ---
-    // --- They remain unchanged as they operate on the final 'data' array ---
-
+    /**
+     * Calculates and displays the main KPIs (Key Performance Indicators)
+     * @param {Array<Object>} data - The parsed data
+     */
     function processAndRenderKPIs(data) {
         const totalPushes = data.length;
         const mobileNumbers = new Set(data.map(row => row['Mobile Number']?.replace(/[^0-9]/g, '')).filter(Boolean));
@@ -344,6 +344,10 @@
         document.getElementById('unique-push').innerText = uniquePushes;
     }
 
+    /**
+     * Processes data for and renders the Leads Pushed by University chart
+     * @param {Array<Object>} data - The parsed data
+     */
     function processAndRenderLeadsPushedChart(data) {
         const universityCounts = data.reduce((acc, row) => {
             const university = row['Opportunity: University Interested In'];
@@ -363,6 +367,10 @@
         });
     }
     
+    /**
+     * Processes data for and renders the Lead Composition donut chart
+     * @param {Array<Object>} data - The parsed data
+     */
     function processAndRenderLeadCompositionChart(data) {
         const totalPushes = data.length;
         const uniquePushes = new Set(data.map(row => row['Mobile Number']?.replace(/[^0-9]/g, '')).filter(Boolean)).size;
@@ -377,6 +385,10 @@
         });
     }
 
+    /**
+     * Processes data for and renders the Push to ERP and Unique Trend line chart
+     * @param {Array<Object>} data - The parsed data
+     */
     function processAndRenderPushTrendChart(data) {
         const dailyData = {};
         data.forEach(row => {
@@ -412,6 +424,7 @@
         });
     }
 </script>
+
 
 </body>
 </html>
