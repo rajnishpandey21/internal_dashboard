@@ -234,38 +234,48 @@
     </div>
 
 <script>
-    // URL for the published Google Sheet CSV
-    const sheetUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ-8syL70s-kwK8VPPf3HrwRDgtUNWDAwIz3s23uWQgkJa81bUnk9a4xSF2g9sYfYq7GJm8PQsGt68g/pub?gid=0&single=true&output=csv';
+    // URLs for the published Google Sheets
+    const sheet1Url = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ-8syL70s-kwK8VPPf3HrwRDgtUNWDAwIz3s23uWQgkJa81bUnk9a4xSF2g9sYfYq7GJm8PQsGt68g/pub?gid=0&single=true&output=csv';
+    
+    // --- IMPORTANT! PASTE YOUR URL FOR SHEET 2 HERE ---
+    const sheet2Url = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ-8syL70s-kwK8VPPf3HrwRDgtUNWDAwIz3s23uWQgkJa81bUnk9a4xSF2g9sYfYq7GJm8PQsGt68g/pub?gid=1166157628&single=true&output=csv'; 
 
-    // This function runs when the page is loaded
     document.addEventListener('DOMContentLoaded', () => {
         loadDashboardData();
     });
 
     /**
-     * Main function to fetch, process, and render dashboard data
+     * Main function to fetch, process, and render dashboard data from multiple sources
      */
     async function loadDashboardData() {
         try {
-            // Added 'no-cors' mode as a fallback for fetch issues, though it has limitations.
-            const response = await fetch(sheetUrl);
-            if (!response.ok) {
-                throw new Error(`Network response was not ok. Status: ${response.status}`);
+            // Create an array to hold fetch promises
+            const fetchPromises = [
+                fetch(sheet1Url).then(res => res.ok ? res.text() : Promise.reject(`Sheet1 fetch failed: ${res.status}`))
+            ];
+
+            // Check if the user has replaced the placeholder URL for sheet 2
+            if (sheet2Url && sheet2Url !== 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ-8syL70s-kwK8VPPf3HrwRDgtUNWDAwIz3s23uWQgkJa81bUnk9a4xSF2g9sYfYq7GJm8PQsGt68g/pub?gid=1166157628&single=true&output=csv') {
+                fetchPromises.push(
+                    fetch(sheet2Url).then(res => res.ok ? res.text() : Promise.reject(`Sheet2 fetch failed: ${res.status}`))
+                );
             }
-            const csvText = await response.text();
+
+            // Wait for all fetches to complete
+            const csvResults = await Promise.all(fetchPromises);
+
+            // Parse the CSV text from all fetched sheets and combine the data
+            const combinedData = csvResults.flatMap(csvText => robustParseCSV(csvText));
             
-            // Using the new robust CSV parser
-            const data = robustParseCSV(csvText);
-            
-            if (data.length === 0) {
-                 throw new Error('CSV parsing resulted in no data. Check CSV format and content.');
+            if (combinedData.length === 0) {
+                 throw new Error('CSV parsing resulted in no data. Check CSV format and URLs.');
             }
             
-            // --- Process Data ---
-            processAndRenderKPIs(data);
-            processAndRenderLeadsPushedChart(data);
-            processAndRenderLeadCompositionChart(data);
-            processAndRenderPushTrendChart(data);
+            // --- Process and render using the combined data ---
+            processAndRenderKPIs(combinedData);
+            processAndRenderLeadsPushedChart(combinedData);
+            processAndRenderLeadCompositionChart(combinedData);
+            processAndRenderPushTrendChart(combinedData);
 
         } catch (error) {
             console.error('Error loading dashboard data:', error);
@@ -275,19 +285,18 @@
     }
     
     /**
-     * A more robust CSV parser that handles quoted fields containing commas.
-     * @param {string} csvText - The raw CSV string.
-     * @returns {Array<Object>}
+     * A robust CSV parser that handles quoted fields containing commas.
      */
     function robustParseCSV(csvText) {
+        if (!csvText) return [];
         const lines = csvText.trim().replace(/\r/g, '').split('\n');
         if (lines.length < 2) return [];
 
+        // Use the first line of each file as headers, assuming they are the same
         const headers = lines.shift().split(',').map(h => h.trim());
         const data = [];
 
         lines.forEach(line => {
-            // Skip empty lines
             if (!line.trim()) return;
 
             const values = [];
@@ -296,8 +305,7 @@
 
             for (let i = 0; i < line.length; i++) {
                 const char = line[i];
-
-                if (char === '"') {
+                if (char === '"' && (i === 0 || line[i-1] !== '\\')) { // Handles escaped quotes if any
                     inQuotes = !inQuotes;
                 } else if (char === ',' && !inQuotes) {
                     values.push(currentField);
@@ -306,214 +314,100 @@
                     currentField += char;
                 }
             }
-            values.push(currentField); // Add the last field
+            values.push(currentField);
 
             if (values.length === headers.length) {
                 const rowObject = {};
                 headers.forEach((header, index) => {
-                    rowObject[header] = values[index].trim();
+                    rowObject[header] = values[index] ? values[index].trim().replace(/^"|"$/g, '') : '';
                 });
                 data.push(rowObject);
             } else {
-                console.warn('Skipping malformed CSV row:', line);
+                 console.warn('Skipping malformed CSV row:', line);
             }
         });
-
         return data;
     }
     
-    /**
-     * Calculates and displays the main KPIs (Key Performance Indicators)
-     * @param {Array<Object>} data - The parsed data
-     */
+    // --- The following functions are for processing and rendering the charts ---
+    // --- They remain unchanged as they operate on the final 'data' array ---
+
     function processAndRenderKPIs(data) {
         const totalPushes = data.length;
-        
-        const mobileNumbers = new Set();
-        data.forEach(row => {
-            // Standardize mobile number by removing non-numeric characters
-            const mobile = row['Mobile Number']?.replace(/[^0-9]/g, '');
-            if (mobile) {
-                mobileNumbers.add(mobile);
-            }
-        });
+        const mobileNumbers = new Set(data.map(row => row['Mobile Number']?.replace(/[^0-9]/g, '')).filter(Boolean));
         const uniquePushes = mobileNumbers.size;
-
         document.getElementById('total-push').innerText = totalPushes;
         document.getElementById('unique-push').innerText = uniquePushes;
     }
 
-    /**
-     * Processes data for and renders the Leads Pushed by University chart
-     * @param {Array<Object>} data - The parsed data
-     */
     function processAndRenderLeadsPushedChart(data) {
         const universityCounts = data.reduce((acc, row) => {
             const university = row['Opportunity: University Interested In'];
-            if (university) {
-                acc[university] = (acc[university] || 0) + 1;
-            }
+            if (university) acc[university] = (acc[university] || 0) + 1;
             return acc;
         }, {});
-
-        const sortedUniversities = Object.entries(universityCounts)
-            .sort(([, a], [, b]) => b - a);
-
+        const sortedUniversities = Object.entries(universityCounts).sort(([, a], [, b]) => b - a);
         const labels = sortedUniversities.map(entry => entry[0]);
         const counts = sortedUniversities.map(entry => entry[1]);
 
         const ctx = document.getElementById('leadsPushedChart').getContext('2d');
-        new Chart(ctx, {
-            type: 'bar', // A bar chart is better for long labels
-            data: {
-                labels: labels,
-                datasets: [{
-                    label: 'Leads Pushed',
-                    data: counts,
-                    backgroundColor: 'rgba(237, 143, 3, 0.7)',
-                    borderColor: 'rgba(237, 143, 3, 1)',
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                indexAxis: 'y', // Makes the bar chart horizontal
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        display: false
-                    }
-                },
-                scales: {
-                    x: {
-                        beginAtZero: true
-                    }
-                }
-            }
+        if(window.leadsPushedChart instanceof Chart) { window.leadsPushedChart.destroy(); }
+        window.leadsPushedChart = new Chart(ctx, {
+            type: 'bar',
+            data: { labels, datasets: [{ label: 'Leads Pushed', data: counts, backgroundColor: 'rgba(237, 143, 3, 0.7)', borderColor: 'rgba(237, 143, 3, 1)', borderWidth: 1 }] },
+            options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true } } }
         });
     }
     
-     /**
-     * Processes data for and renders the Lead Composition donut chart
-     * @param {Array<Object>} data - The parsed data
-     */
     function processAndRenderLeadCompositionChart(data) {
         const totalPushes = data.length;
-         const mobileNumbers = new Set();
-        data.forEach(row => {
-            const mobile = row['Mobile Number']?.replace(/[^0-9]/g, '');
-            if (mobile) {
-                mobileNumbers.add(mobile);
-            }
-        });
-        const uniquePushes = mobileNumbers.size;
+        const uniquePushes = new Set(data.map(row => row['Mobile Number']?.replace(/[^0-9]/g, '')).filter(Boolean)).size;
         const duplicatePushes = totalPushes - uniquePushes;
 
         const ctx = document.getElementById('leadCompositionChart').getContext('2d');
-        new Chart(ctx, {
+        if(window.leadCompositionChart instanceof Chart) { window.leadCompositionChart.destroy(); }
+        window.leadCompositionChart = new Chart(ctx, {
             type: 'doughnut',
-            data: {
-                labels: ['Unique Leads', 'Duplicate Leads'],
-                datasets: [{
-                    data: [uniquePushes, duplicatePushes],
-                    backgroundColor: ['#ed8f03', '#ffb75e'],
-                    hoverOffset: 4
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                 plugins: {
-                    legend: {
-                        position: 'top',
-                    },
-                }
-            }
+            data: { labels: ['Unique Leads', 'Duplicate Leads'], datasets: [{ data: [uniquePushes, duplicatePushes], backgroundColor: ['#ed8f03', '#ffb75e'], hoverOffset: 4 }] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' } } }
         });
     }
 
-    /**
-     * Processes data for and renders the Push to ERP and Unique Trend line chart
-     * @param {Array<Object>} data - The parsed data
-     */
     function processAndRenderPushTrendChart(data) {
         const dailyData = {};
-
         data.forEach(row => {
-            // Check if the 'Captured On' field exists and is a string
             if (typeof row['Captured On'] !== 'string') return;
-            const dateStr = row['Captured On'].split(',')[0]; // Get DD/MM/YYYY part
+            const dateStr = row['Captured On'].split(',')[0];
             const mobile = row['Mobile Number']?.replace(/[^0-9]/g, '');
-            
-            // Reformat date from DD/MM/YYYY to YYYY-MM-DD for correct sorting
             const parts = dateStr.split('/');
-            if(parts.length !== 3) return; // Skip invalid date formats
+            if(parts.length !== 3) return;
             const formattedDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
-
             if (!dailyData[formattedDate]) {
-                dailyData[formattedDate] = {
-                    total: 0,
-                    uniqueMobiles: new Set()
-                };
+                dailyData[formattedDate] = { total: 0, uniqueMobiles: new Set() };
             }
             dailyData[formattedDate].total++;
             if(mobile) dailyData[formattedDate].uniqueMobiles.add(mobile);
         });
-
         const sortedDates = Object.keys(dailyData).sort();
-
         const labels = sortedDates;
         const totalPushData = sortedDates.map(date => dailyData[date].total);
         const uniquePushData = sortedDates.map(date => dailyData[date].uniqueMobiles.size);
 
         const ctx = document.getElementById('pushTrendChart').getContext('2d');
-        new Chart(ctx, {
+        if(window.pushTrendChart instanceof Chart) { window.pushTrendChart.destroy(); }
+        window.pushTrendChart = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: labels,
+                labels,
                 datasets: [
-                    {
-                        label: 'Total Pushes',
-                        data: totalPushData,
-                        borderColor: '#ed8f03',
-                        backgroundColor: 'rgba(237, 143, 3, 0.1)',
-                        fill: true,
-                        tension: 0.1
-                    },
-                    {
-                        label: 'Unique Pushes',
-                        data: uniquePushData,
-                        borderColor: '#6a3d9a',
-                        backgroundColor: 'rgba(106, 61, 154, 0.1)',
-                        fill: true,
-                        tension: 0.1
-                    }
+                    { label: 'Total Pushes', data: totalPushData, borderColor: '#ed8f03', backgroundColor: 'rgba(237, 143, 3, 0.1)', fill: true, tension: 0.1 },
+                    { label: 'Unique Pushes', data: uniquePushData, borderColor: '#6a3d9a', backgroundColor: 'rgba(106, 61, 154, 0.1)', fill: true, tension: 0.1 }
                 ]
             },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        beginAtZero: true
-                    },
-                    x: {
-                       type: 'time',
-                       time: {
-                           unit: 'day',
-                           tooltipFormat: 'dd/MM/yyyy'
-                       }
-                    }
-                },
-                plugins: {
-                   legend: {
-                        position: 'top',
-                    }
-                }
-            }
+            options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true }, x: { type: 'time', time: { unit: 'day', tooltipFormat: 'dd/MM/yyyy' } } }, plugins: { legend: { position: 'top' } } }
         });
     }
-
 </script>
+
 </body>
 </html>
