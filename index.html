@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CareerKaptain Internal - Dynamic Dashboard</title>
+    <!-- Include Chart.js library -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+
+    <style>
+        /* --- Universal Box Sizing --- */
+        *, *::before, *::after {
+            box-sizing: border-box;
+        }
+
+        /* --- General Body and Font Styles --- */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+            margin: 0;
+            padding: 20px;
+            background-image: linear-gradient(to top right, #ffb75e, #ed8f03);
+            color: #333;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+        }
+
+        /* --- Main Dashboard Container --- */
+        .dashboard-container {
+            width: 100%;
+            max-width: 1400px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* --- General Card/Box Styling --- */
+        .card {
+            background-color: #ffffff;
+            border: 2px solid black;
+            border-radius: 16px;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 24px rgba(0, 0, 0, 0.25);
+        }
+
+        /* --- Row Layouts --- */
+        .row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            width: 100%;
+        }
+
+        /* --- Header / Date Filter --- */
+        .header {
+            text-align: center;
+        }
+        
+        .date-range-card {
+            background-color: #ffffff;
+            border: 2px solid black;
+            border-radius: 16px;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+            padding: 15px 30px;
+            display: inline-block;
+            font-size: 1.1em;
+            font-weight: 500;
+        }
+        
+        /* --- Stat Card Specifics --- */
+        .stat-card {
+            flex: 1;
+            min-width: 150px;
+            text-align: center;
+        }
+
+        .stat-card h3 {
+            margin: 0 0 10px 0;
+            font-size: 1em;
+            color: #555;
+            font-weight: 600;
+        }
+
+        .stat-card .number {
+            margin: 0;
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #000;
+        }
+        
+        /* --- Chart Card Specifics --- */
+        .chart-card {
+           flex-grow: 1;
+           min-height: 450px; /* Ensure cards have a minimum height */
+        }
+        
+        .chart-card h3 {
+            margin-top: 0;
+            text-align: center;
+        }
+        
+        .chart-container {
+            position: relative;
+            flex-grow: 1;
+            width: 100%;
+            max-height: 400px; /* Max height for scrollable chart */
+            overflow-y: auto; /* Make it scrollable if content overflows */
+        }
+
+        .line-chart-container {
+             max-height: none; /* Override for line chart */
+             overflow-y: visible;
+        }
+        
+        /* --- Sizing for different chart rows --- */
+        .row .chart-col-3 {
+            flex: 1 1 0; 
+            min-width: 0;
+        }
+        
+        .row .chart-col-donut {
+            flex: 3;
+            min-width: 0;
+        }
+        
+        .row .chart-col-trend {
+            flex: 7;
+            min-width: 0;
+        }
+        
+        /* --- Responsive Adjustments --- */
+        @media (max-width: 992px) {
+            .row .chart-col-3,
+            .row .chart-col-donut,
+            .row .chart-col-trend {
+                flex-basis: 100%;
+                flex-grow: 0;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+                align-items: flex-start;
+            }
+            .dashboard-container, .row {
+                gap: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="dashboard-container">
+        <!-- Row 1: Date Range Filter -->
+        <div class="header">
+             <div class="date-range-card">Date Range</div>
+        </div>
+
+        <!-- Row 2: Statistics Cards -->
+        <div class="row">
+            <div class="card stat-card">
+                <h3>Total Push To ERP</h3>
+                <p id="total-push" class="number">...</p>
+            </div>
+            <div class="card stat-card">
+                <h3>Unique Push To ERP</h3>
+                <p id="unique-push" class="number">...</p>
+            </div>
+            <div class="card stat-card">
+                <h3>Total Applications</h3>
+                <p id="total-apps" class="number">-</p>
+            </div>
+            <div class="card stat-card">
+                <h3>Primary Applications</h3>
+                <p id="primary-apps" class="number">-</p>
+            </div>
+            <div class="card stat-card">
+                <h3>Total Admissions</h3>
+                <p id="total-admissions" class="number">-</p>
+            </div>
+        </div>
+
+        <!-- Row 3: Column Graph Cards -->
+        <div class="row">
+            <div class="card chart-card chart-col-3">
+                <h3>Leads Pushed by University</h3>
+                <div class="chart-container">
+                    <canvas id="leadsPushedChart"></canvas>
+                </div>
+            </div>
+            <div class="card chart-card chart-col-3">
+                <h3>Primary Applications</h3>
+                <div class="chart-container">
+                    <!-- Placeholder for now -->
+                     <p>Chart coming soon...</p>
+                </div>
+            </div>
+            <div class="card chart-card chart-col-3">
+                <h3>Primary Admissions</h3>
+                <div class="chart-container">
+                    <!-- Placeholder for now -->
+                     <p>Chart coming soon...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 4: Donut and Line Graph Cards -->
+        <div class="row">
+            <div class="card chart-card chart-col-donut">
+                <h3>Lead Composition</h3>
+                 <div class="chart-container line-chart-container">
+                    <canvas id="leadCompositionChart"></canvas>
+                </div>
+            </div>
+            <div class="card chart-card chart-col-trend">
+                <h3>Push to ERP and Unique Trend</h3>
+                 <div class="chart-container line-chart-container">
+                    <canvas id="pushTrendChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script>
+    // URL for the published Google Sheet CSV
+    const sheetUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ-8syL70s-kwK8VPPf3HrwRDgtUNWDAwIz3s23uWQgkJa81bUnk9a4xSF2g9sYfYq7GJm8PQsGt68g/pub?gid=0&single=true&output=csv';
+
+    // This function runs when the page is loaded
+    document.addEventListener('DOMContentLoaded', () => {
+        loadDashboardData();
+    });
+
+    /**
+     * Main function to fetch, process, and render dashboard data
+     */
+    async function loadDashboardData() {
+        try {
+            const response = await fetch(sheetUrl);
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            const csvText = await response.text();
+            const data = parseCSV(csvText);
+            
+            // --- Process Data ---
+            processAndRenderKPIs(data);
+            processAndRenderLeadsPushedChart(data);
+            processAndRenderLeadCompositionChart(data);
+            processAndRenderPushTrendChart(data);
+
+        } catch (error) {
+            console.error('Error loading dashboard data:', error);
+            // You could display an error message to the user here
+        }
+    }
+
+    /**
+     * Parses CSV text into an array of objects
+     * @param {string} text - The raw CSV string
+     * @returns {Array<Object>}
+     */
+    function parseCSV(text) {
+        const lines = text.trim().split('\n');
+        const headers = lines[0].split(',').map(h => h.trim());
+        const rows = [];
+        for (let i = 1; i < lines.length; i++) {
+            const values = lines[i].split(',').map(v => v.trim());
+            // Basic check to skip empty rows
+            if (values.length !== headers.length) continue;
+
+            const rowObject = {};
+            headers.forEach((header, index) => {
+                rowObject[header] = values[index];
+            });
+            rows.push(rowObject);
+        }
+        return rows;
+    }
+    
+    /**
+     * Calculates and displays the main KPIs (Key Performance Indicators)
+     * @param {Array<Object>} data - The parsed data
+     */
+    function processAndRenderKPIs(data) {
+        const totalPushes = data.length;
+        
+        const mobileNumbers = new Set();
+        data.forEach(row => {
+            // Standardize mobile number by removing non-numeric characters
+            const mobile = row['Mobile Number']?.replace(/[^0-9]/g, '');
+            if (mobile) {
+                mobileNumbers.add(mobile);
+            }
+        });
+        const uniquePushes = mobileNumbers.size;
+
+        document.getElementById('total-push').innerText = totalPushes;
+        document.getElementById('unique-push').innerText = uniquePushes;
+    }
+
+    /**
+     * Processes data for and renders the Leads Pushed by University chart
+     * @param {Array<Object>} data - The parsed data
+     */
+    function processAndRenderLeadsPushedChart(data) {
+        const universityCounts = data.reduce((acc, row) => {
+            const university = row['Opportunity: University Interested In'];
+            if (university) {
+                acc[university] = (acc[university] || 0) + 1;
+            }
+            return acc;
+        }, {});
+
+        const sortedUniversities = Object.entries(universityCounts)
+            .sort(([, a], [, b]) => b - a);
+
+        const labels = sortedUniversities.map(entry => entry[0]);
+        const counts = sortedUniversities.map(entry => entry[1]);
+
+        const ctx = document.getElementById('leadsPushedChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'bar', // A bar chart is better for long labels
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Leads Pushed',
+                    data: counts,
+                    backgroundColor: 'rgba(237, 143, 3, 0.7)',
+                    borderColor: 'rgba(237, 143, 3, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                indexAxis: 'y', // Makes the bar chart horizontal
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    x: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    }
+    
+     /**
+     * Processes data for and renders the Lead Composition donut chart
+     * @param {Array<Object>} data - The parsed data
+     */
+    function processAndRenderLeadCompositionChart(data) {
+        const totalPushes = data.length;
+         const mobileNumbers = new Set();
+        data.forEach(row => {
+            const mobile = row['Mobile Number']?.replace(/[^0-9]/g, '');
+            if (mobile) {
+                mobileNumbers.add(mobile);
+            }
+        });
+        const uniquePushes = mobileNumbers.size;
+        const duplicatePushes = totalPushes - uniquePushes;
+
+        const ctx = document.getElementById('leadCompositionChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Unique Leads', 'Duplicate Leads'],
+                datasets: [{
+                    data: [uniquePushes, duplicatePushes],
+                    backgroundColor: ['#ed8f03', '#ffb75e'],
+                    hoverOffset: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                 plugins: {
+                    legend: {
+                        position: 'top',
+                    },
+                }
+            }
+        });
+    }
+
+    /**
+     * Processes data for and renders the Push to ERP and Unique Trend line chart
+     * @param {Array<Object>} data - The parsed data
+     */
+    function processAndRenderPushTrendChart(data) {
+        const dailyData = {};
+
+        data.forEach(row => {
+            const dateStr = row['Captured On'].split(',')[0]; // Get DD/MM/YYYY part
+            const mobile = row['Mobile Number']?.replace(/[^0-9]/g, '');
+            
+            // Reformat date from DD/MM/YYYY to YYYY-MM-DD for correct sorting
+            const parts = dateStr.split('/');
+            if(parts.length !== 3) return; // Skip invalid date formats
+            const formattedDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
+
+            if (!dailyData[formattedDate]) {
+                dailyData[formattedDate] = {
+                    total: 0,
+                    uniqueMobiles: new Set()
+                };
+            }
+            dailyData[formattedDate].total++;
+            if(mobile) dailyData[formattedDate].uniqueMobiles.add(mobile);
+        });
+
+        const sortedDates = Object.keys(dailyData).sort();
+
+        const labels = sortedDates;
+        const totalPushData = sortedDates.map(date => dailyData[date].total);
+        const uniquePushData = sortedDates.map(date => dailyData[date].uniqueMobiles.size);
+
+        const ctx = document.getElementById('pushTrendChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Total Pushes',
+                        data: totalPushData,
+                        borderColor: '#ed8f03',
+                        backgroundColor: 'rgba(237, 143, 3, 0.1)',
+                        fill: true,
+                        tension: 0.1
+                    },
+                    {
+                        label: 'Unique Pushes',
+                        data: uniquePushData,
+                        borderColor: '#6a3d9a',
+                        backgroundColor: 'rgba(106, 61, 154, 0.1)',
+                        fill: true,
+                        tension: 0.1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    },
+                    x: {
+                       type: 'time',
+                       time: {
+                           unit: 'day',
+                           tooltipFormat: 'dd/MM/yyyy'
+                       }
+                    }
+                },
+                plugins: {
+                   legend: {
+                        position: 'top',
+                    }
+                }
+            }
+        });
+    }
+
+
+</script>
+</body>
+</html>
