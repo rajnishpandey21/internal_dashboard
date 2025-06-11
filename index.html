@@ -231,7 +231,7 @@
 
 <script>
     // --- Your new, real-time Google Apps Script Web App URL ---
-    const webAppUrl = 'https://script.google.com/macros/s/AKfycbyTDEwfpIUS78Rg8hHdMLx676LKZpBzytz6nnRb5doQpHltTC2Isfahb1dXHrKOMtka/exec';
+    const webAppUrl = 'https://script.google.com/macros/s/AKfycbx9A4DPAebEY3XukJ1IThpYrYzkrHy56pLuxeOSpqSmT8i1aHtsEhVW_c0OYwRdU9ZF/exec';
 
     // This global variable will hold the master dataset.
     let masterData = [];
@@ -268,10 +268,9 @@
             if (!response.ok) throw new Error(`Network response was not ok: ${response.statusText}`);
 
             const data = await response.json();
-            if (data.error) throw new Error(`Error from Apps Script: ${data.error}`);
+            if (data.error) throw new Error(`Error from Apps Script: ${JSON.stringify(data.error)}`);
             
             // The data from the API is now the single source of truth.
-            // No client-side validation is needed as the Apps Script handles it.
             masterData = data;
             
             if (masterData.length === 0) throw new Error('No data received from the Web App.');
@@ -302,15 +301,28 @@
             return;
         }
         
-        const startDate = startDateInput.value;
-        const endDate = endDateInput.value;
+        let startDate = startDateInput.value;
+        let endDate = endDateInput.value;
+        
+        // If a start date is chosen but no end date, set end date to today.
+        if (startDate && !endDate) {
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = String(today.getMonth() + 1).padStart(2, '0');
+            const day = String(today.getDate()).padStart(2, '0');
+            endDate = `${year}-${month}-${day}`;
+        }
         
         console.log(`Filtering data between: Start='${startDate || 'None'}' and End='${endDate || 'None'}'`);
 
         const filteredData = masterData.filter(row => {
-            // The 'Captured On' field is already a trustworthy YYYY-MM-DD string from our API.
             const rowDate = row['Captured On'];
             if (!rowDate) return false;
+
+            // If no dates are selected, show all data.
+            if (!startDate && !endDate) {
+                return true;
+            }
 
             const isAfterStartDate = !startDate || rowDate >= startDate;
             const isBeforeEndDate = !endDate || rowDate <= endDate;
@@ -335,25 +347,8 @@
     
     function processAndRenderKPIs(data) {
         const totalPushes = data.length;
-        console.log("--- Starting Unique Count Diagnosis ---");
-        console.log(`Total rows being processed in current view: ${data.length}`);
-        const allMobileNumbers = data.map(row => ({
-            original: row['Mobile Number'],
-            cleaned: String(row['Mobile Number'] || '').replace(/[^0-9]/g, ''),
-            name: row['Name'] || 'No Name Provided'
-        }));
-        const validMobileNumbers = allMobileNumbers.filter(num => num.cleaned);
-        const invalidOrBlankRows = allMobileNumbers.filter(num => !num.cleaned);
-        const uniqueMobileNumbersSet = new Set(validMobileNumbers.map(num => num.cleaned));
-        const uniquePushes = uniqueMobileNumbersSet.size;
-        console.log(`Found ${uniquePushes} unique mobile numbers.`);
-        if (invalidOrBlankRows.length > 0) {
-            console.warn(`WARNING: Found ${invalidOrBlankRows.length} rows with blank or invalid mobile numbers. These are NOT included in the unique count.`);
-            console.table(invalidOrBlankRows.map(row => ({ Name: row.name, OriginalMobileEntry: row.original })));
-        } else {
-            console.log("All rows processed had a valid mobile number entry.");
-        }
-        console.log("--- End of Diagnosis ---");
+        const mobileNumbers = new Set(data.map(row => String(row['Mobile Number'] || '').replace(/[^0-9]/g, '')).filter(Boolean));
+        const uniquePushes = mobileNumbers.size;
         document.getElementById('total-push').innerText = totalPushes;
         document.getElementById('unique-push').innerText = uniquePushes;
     }
@@ -401,17 +396,14 @@
             dailyData[formattedDate].total++;
             if(mobile) dailyData[formattedDate].uniqueMobiles.add(mobile);
         });
-        const sortedDates = Object.keys(dailyData).sort();
+        
+        // Get the keys and then sort them chronologically before creating the chart labels.
+        const sortedDates = Object.keys(dailyData).sort((a, b) => new Date(a) - new Date(b));
+
         const labels = sortedDates;
         const totalPushData = sortedDates.map(date => dailyData[date].total);
         const uniquePushData = sortedDates.map(date => dailyData[date].uniqueMobiles.size);
         
-        if(labels.length > 0) {
-            console.log("First 5 dates being sent to trend chart:", labels.slice(0, 5));
-        } else {
-            console.log("No valid date data to create trend chart.");
-        }
-
         const ctx = document.getElementById('pushTrendChart').getContext('2d');
         if(window.pushTrendChart instanceof Chart) { window.pushTrendChart.destroy(); }
         window.pushTrendChart = new Chart(ctx, {
