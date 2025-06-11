@@ -61,22 +61,6 @@
             gap: 20px;
             width: 100%;
         }
-
-        /* --- Header / Date Filter --- */
-        .header {
-            text-align: center;
-        }
-        
-        .date-range-card {
-            background-color: #ffffff;
-            border: 2px solid black;
-            border-radius: 16px;
-            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
-            padding: 15px 30px;
-            display: inline-block;
-            font-size: 1.1em;
-            font-weight: 500;
-        }
         
         /* --- Stat Card Specifics --- */
         .stat-card {
@@ -163,25 +147,24 @@
 <body>
 
     <div class="dashboard-container">
-        <!-- Row 1: Date Range Filter -->
- <!-- Row 1: Interactive Header -->
-<div class="header" style="display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 20px;">
+        <!-- Row 1: Interactive Header -->
+        <div class="header" style="display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 20px;">
     
-    <!-- Date Filter Card -->
-    <div class="card" style="flex-direction: row; align-items: center; gap: 15px; padding: 10px 20px;">
-        <label for="start-date" style="font-weight: 500;">Start Date:</label>
-        <input type="date" id="start-date" style="padding: 8px; border-radius: 8px; border: 1px solid #ccc; font-size: 14px;">
+            <!-- Date Filter Card -->
+            <div class="card" style="flex-direction: row; align-items: center; gap: 15px; padding: 10px 20px;">
+                <label for="start-date" style="font-weight: 500;">Start Date:</label>
+                <input type="date" id="start-date" style="padding: 8px; border-radius: 8px; border: 1px solid #ccc; font-size: 14px;">
+                
+                <label for="end-date" style="font-weight: 500; margin-left: 10px;">End Date:</label>
+                <input type="date" id="end-date" style="padding: 8px; border-radius: 8px; border: 1px solid #ccc; font-size: 14px;">
+            </div>
         
-        <label for="end-date" style="font-weight: 500; margin-left: 10px;">End Date:</label>
-        <input type="date" id="end-date" style="padding: 8px; border-radius: 8px; border: 1px solid #ccc; font-size: 14px;">
-    </div>
-
-    <!-- Refresh Button -->
-    <button id="refresh-data-btn" style="padding: 12px 22px; border: 2px solid black; border-radius: 16px; background-image: linear-gradient(to top right, #ffb75e, #ed8f03); color: black; font-weight: bold; font-size: 1em; cursor: pointer; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); transition: all 0.2s ease;">
-        Refresh Data
-    </button>
-
-</div>
+            <!-- Refresh Button -->
+            <button id="refresh-data-btn" style="padding: 12px 22px; border: 2px solid black; border-radius: 16px; background-image: linear-gradient(to top right, #ffb75e, #ed8f03); color: black; font-weight: bold; font-size: 1em; cursor: pointer; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); transition: all 0.2s ease;">
+                Refresh Data
+            </button>
+        
+        </div>
 
         <!-- Row 2: Statistics Cards -->
         <div class="row">
@@ -218,15 +201,13 @@
             <div class="card chart-card chart-col-3">
                 <h3>Primary Applications</h3>
                 <div class="chart-container">
-                    <!-- Placeholder for now -->
-                     <p style="text-align:center; padding-top:20px;">Chart coming soon...</p>
+                    <p style="text-align:center; padding-top:20px;">Chart coming soon...</p>
                 </div>
             </div>
             <div class="card chart-card chart-col-3">
                 <h3>Primary Admissions</h3>
                 <div class="chart-container">
-                    <!-- Placeholder for now -->
-                     <p style="text-align:center; padding-top:20px;">Chart coming soon...</p>
+                    <p style="text-align:center; padding-top:20px;">Chart coming soon...</p>
                 </div>
             </div>
         </div>
@@ -289,13 +270,9 @@
             const data = await response.json();
             if (data.error) throw new Error(`Error from Apps Script: ${data.error}`);
             
-            // --- ROBUSTNESS FIX ---
-            // Re-normalize dates on the client-side to ensure consistency.
-            // This protects the dashboard from any upstream data formatting errors.
-            masterData = data.map(row => {
-                const validatedDate = validateAndFormatDate(row['Captured On']);
-                return { ...row, 'Captured On': validatedDate };
-            });
+            // The data from the API is now the single source of truth.
+            // No client-side validation is needed as the Apps Script handles it.
+            masterData = data;
             
             if (masterData.length === 0) throw new Error('No data received from the Web App.');
             
@@ -312,30 +289,6 @@
             }
         }
     }
-    
-    /**
-     * NEW Helper function to validate and re-format dates on the client side.
-     * This ensures all dates are in a consistent YYYY-MM-DD format.
-     * @param {string} dateStr - The date string from the API (which should already be YYYY-MM-DD).
-     * @returns {string|null} - A validated YYYY-MM-DD string, or null.
-     */
-    function validateAndFormatDate(dateStr) {
-        if (!dateStr || typeof dateStr !== 'string') return null;
-        // Attempt to create a date object. This is very flexible and can handle
-        // YYYY-MM-DD, MM/DD/YYYY, etc., but we will re-format it to be safe.
-        const d = new Date(dateStr);
-        // Check if the created date is valid.
-        if (d instanceof Date && !isNaN(d.getTime())) {
-            const year = d.getFullYear();
-            // Add 1 to month because getMonth() is zero-based (0-11).
-            const month = String(d.getMonth() + 1).padStart(2, '0'); 
-            const day = String(d.getDate()).padStart(2, '0');
-            return `${year}-${month}-${day}`;
-        }
-        // Return null if the input string is not a recognizable date.
-        return null;
-    }
-
 
     /**
      * This function filters the master data and re-renders all charts.
@@ -352,10 +305,10 @@
         const startDate = startDateInput.value;
         const endDate = endDateInput.value;
         
-        // --- DIAGNOSTIC LOGGING ---
         console.log(`Filtering data between: Start='${startDate || 'None'}' and End='${endDate || 'None'}'`);
 
         const filteredData = masterData.filter(row => {
+            // The 'Captured On' field is already a trustworthy YYYY-MM-DD string from our API.
             const rowDate = row['Captured On'];
             if (!rowDate) return false;
 
@@ -453,7 +406,6 @@
         const totalPushData = sortedDates.map(date => dailyData[date].total);
         const uniquePushData = sortedDates.map(date => dailyData[date].uniqueMobiles.size);
         
-        // --- DIAGNOSTIC LOGGING ---
         if(labels.length > 0) {
             console.log("First 5 dates being sent to trend chart:", labels.slice(0, 5));
         } else {
@@ -475,7 +427,6 @@
         });
     }
 </script>
-
 
 </body>
 </html>
