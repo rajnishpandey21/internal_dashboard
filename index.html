@@ -165,7 +165,12 @@
     <div class="dashboard-container">
         <!-- Row 1: Date Range Filter -->
         <div class="header">
-             <div class="date-range-card">Date Range</div>
+           <div class="card" style="flex-direction: row; align-items: center; gap: 15px; padding: 10px 20px;">
+    <label for="start-date" style="font-weight: 500;">Start Date:</label>
+    <input type="date" id="start-date" style="padding: 5px; border-radius: 8px; border: 1px solid #ccc;">
+    <label for="end-date" style="font-weight: 500;">End Date:</label>
+    <input type="date" id="end-date" style="padding: 5px; border-radius: 8px; border: 1px solid #ccc;">
+          </div>
         </div>
 
         <!-- Row 2: Statistics Cards -->
@@ -238,25 +243,38 @@
     const sheet1Url = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ-8syL70s-kwK8VPPf3HrwRDgtUNWDAwIz3s23uWQgkJa81bUnk9a4xSF2g9sYfYq7GJm8PQsGt68g/pub?gid=0&single=true&output=csv';
     const sheet2Url = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ-8syL70s-kwK8VPPf3HrwRDgtUNWDAwIz3s23uWQgkJa81bUnk9a4xSF2g9sYfYq7GJm8PQsGt68g/pub?gid=1166157628&single=true&output=csv';
 
+    // This global variable will hold the master dataset after it's fetched once.
+    let masterData = [];
+
     // This function runs when the page is loaded
     document.addEventListener('DOMContentLoaded', () => {
+        // Set up event listeners for the date filter inputs
+        const startDateInput = document.getElementById('start-date');
+        const endDateInput = document.getElementById('end-date');
+
+        startDateInput.addEventListener('change', updateDashboardView);
+        endDateInput.addEventListener('change', updateDashboardView);
+        
         loadDashboardData();
     });
 
     /**
-     * Main function to fetch, process, and render dashboard data from multiple sources
+     * Main function to fetch, process, and render dashboard data from multiple sources.
+     * This now runs only once on page load.
      */
     async function loadDashboardData() {
         try {
-            const fetchSheet1 = fetch(sheet1Url).then(res => res.ok ? res.text() : Promise.reject(`Sheet1 fetch failed: ${res.status}`));
-            const fetchSheet2 = fetch(sheet2Url).then(res => res.ok ? res.text() : Promise.reject(`Sheet2 fetch failed: ${res.status}`));
+            // Add a unique timestamp to each URL to bypass browser/network caches.
+            const cacheBust = '&_cache_bust=' + new Date().getTime();
+
+            const fetchSheet1 = fetch(sheet1Url + cacheBust).then(res => res.ok ? res.text() : Promise.reject(`Sheet1 fetch failed: ${res.status}`));
+            const fetchSheet2 = fetch(sheet2Url + cacheBust).then(res => res.ok ? res.text() : Promise.reject(`Sheet2 fetch failed: ${res.status}`));
+            
             const [csvText1, csvText2] = await Promise.all([fetchSheet1, fetchSheet2]);
             
-            // Parse the raw CSV text
             const rawData1 = robustParseCSV(csvText1);
             const rawData2 = robustParseCSV(csvText2);
 
-            // Normalize dates for each dataset using the correct, explicit format
             const data1 = rawData1.map(row => ({
                 ...row,
                 'Captured On': normalizeDate(row['Captured On'], 'DD/MM/YYYY')
@@ -266,23 +284,50 @@
                 'Captured On': normalizeDate(row['Captured On'], 'MM/DD/YYYY')
             }));
 
-            // Combine the two processed datasets
-            const combinedData = [...data1, ...data2];
+            // Store the fully processed data in the global masterData variable
+            masterData = [...data1, ...data2];
             
-            if (combinedData.length === 0) {
+            if (masterData.length === 0) {
                  throw new Error('CSV parsing resulted in no data. Check CSV format and URLs.');
             }
             
-            processAndRenderKPIs(combinedData);
-            processAndRenderLeadsPushedChart(combinedData);
-            processAndRenderLeadCompositionChart(combinedData);
-            processAndRenderPushTrendChart(combinedData);
+            // Perform the initial render of the dashboard with all data
+            updateDashboardView();
 
         } catch (error) {
             console.error('Error loading dashboard data:', error);
             document.getElementById('total-push').innerText = 'Error';
             document.getElementById('unique-push').innerText = 'Error';
         }
+    }
+
+    /**
+     * NEW: This function filters the master data and re-renders all charts.
+     * It's called on page load and whenever a date filter is changed.
+     */
+    function updateDashboardView() {
+        const startDateInput = document.getElementById('start-date');
+        const endDateInput = document.getElementById('end-date');
+        
+        const startDate = startDateInput.value; // Format: YYYY-MM-DD
+        const endDate = endDateInput.value;   // Format: YYYY-MM-DD
+
+        // Filter the masterData based on the selected date range
+        const filteredData = masterData.filter(row => {
+            const rowDate = row['Captured On']; // Already in YYYY-MM-DD format
+            if (!rowDate) return false; // Exclude rows with invalid dates
+
+            const isAfterStartDate = !startDate || rowDate >= startDate;
+            const isBeforeEndDate = !endDate || rowDate <= endDate;
+            
+            return isAfterStartDate && isBeforeEndDate;
+        });
+        
+        // Re-render all components with the newly filtered data
+        processAndRenderKPIs(filteredData);
+        processAndRenderLeadsPushedChart(filteredData);
+        processAndRenderLeadCompositionChart(filteredData);
+        processAndRenderPushTrendChart(filteredData);
     }
     
     /**
@@ -298,11 +343,9 @@
 
         lines.forEach(line => {
             if (!line.trim()) return;
-
             const values = [];
             let currentField = '';
             let inQuotes = false;
-
             for (let i = 0; i < line.length; i++) {
                 const char = line[i];
                 if (char === '"' && (i === 0 || line[i-1] !== '\\')) {
@@ -315,7 +358,6 @@
                 }
             }
             values.push(currentField);
-
             if (values.length === headers.length) {
                 const rowObject = {};
                 headers.forEach((header, index) => {
@@ -346,7 +388,6 @@
         const sortedUniversities = Object.entries(universityCounts).sort(([, a], [, b]) => b - a);
         const labels = sortedUniversities.map(entry => entry[0]);
         const counts = sortedUniversities.map(entry => entry[1]);
-
         const ctx = document.getElementById('leadsPushedChart').getContext('2d');
         if(window.leadsPushedChart instanceof Chart) { window.leadsPushedChart.destroy(); }
         window.leadsPushedChart = new Chart(ctx, {
@@ -360,7 +401,6 @@
         const totalPushes = data.length;
         const uniquePushes = new Set(data.map(row => row['Mobile Number']?.replace(/[^0-9]/g, '')).filter(Boolean)).size;
         const duplicatePushes = totalPushes - uniquePushes;
-
         const ctx = document.getElementById('leadCompositionChart').getContext('2d');
         if(window.leadCompositionChart instanceof Chart) { window.leadCompositionChart.destroy(); }
         window.leadCompositionChart = new Chart(ctx, {
@@ -370,29 +410,16 @@
         });
     }
 
-    /**
-     * UPDATED HELPER FUNCTION TO FIX DATES
-     * Normalizes a date string from a specific format.
-     * @param {string} dateString - The date string from the sheet.
-     * @param {string} format - The expected format ('DD/MM/YYYY' or 'MM/DD/YYYY').
-     * @returns {string|null} - Date in YYYY-MM-DD format or null if invalid.
-     */
     function normalizeDate(dateString, format) {
         if (!dateString || typeof dateString !== 'string') return null;
-        
         const datePart = dateString.split(' ')[0].split(',')[0].trim();
         const parts = datePart.split('/');
-        
         if (parts.length !== 3) return null;
-
         let day, month;
         const part1 = parseInt(parts[0], 10);
         const part2 = parseInt(parts[1], 10);
         const year = parseInt(parts[2], 10);
-        
         if (isNaN(part1) || isNaN(part2) || isNaN(year)) return null;
-
-        // Apply format based on the source sheet
         if (format === 'DD/MM/YYYY') {
             day = part1;
             month = part2;
@@ -400,41 +427,30 @@
             month = part1;
             day = part2;
         } else {
-            return null; // Should not happen
+            return null;
         }
-
         if (day > 31 || month > 12 || day < 1 || month < 1) return null;
-
         const monthStr = String(month).padStart(2, '0');
         const dayStr = String(day).padStart(2, '0');
-        
         return `${year}-${monthStr}-${dayStr}`;
     }
 
-    /**
-     * Processes data for and renders the Push to ERP and Unique Trend line chart
-     */
     function processAndRenderPushTrendChart(data) {
         const dailyData = {};
         data.forEach(row => {
-            // The 'Captured On' field is now a standardized YYYY-MM-DD string
             const formattedDate = row['Captured On'];
-            if (!formattedDate) return; // Skip if the date normalization failed
-
+            if (!formattedDate) return;
             const mobile = row['Mobile Number']?.replace(/[^0-9]/g, '');
-            
             if (!dailyData[formattedDate]) {
                 dailyData[formattedDate] = { total: 0, uniqueMobiles: new Set() };
             }
             dailyData[formattedDate].total++;
             if(mobile) dailyData[formattedDate].uniqueMobiles.add(mobile);
         });
-
         const sortedDates = Object.keys(dailyData).sort();
         const labels = sortedDates;
         const totalPushData = sortedDates.map(date => dailyData[date].total);
         const uniquePushData = sortedDates.map(date => dailyData[date].uniqueMobiles.size);
-
         const ctx = document.getElementById('pushTrendChart').getContext('2d');
         if(window.pushTrendChart instanceof Chart) { window.pushTrendChart.destroy(); }
         window.pushTrendChart = new Chart(ctx, {
@@ -450,7 +466,6 @@
         });
     }
 </script>
-
 
 </body>
 </html>
