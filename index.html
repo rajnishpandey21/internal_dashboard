@@ -164,14 +164,24 @@
 
     <div class="dashboard-container">
         <!-- Row 1: Date Range Filter -->
-        <div class="header">
-           <div class="card" style="flex-direction: row; align-items: center; gap: 15px; padding: 10px 20px;">
-    <label for="start-date" style="font-weight: 500;">Start Date:</label>
-    <input type="date" id="start-date" style="padding: 5px; border-radius: 8px; border: 1px solid #ccc;">
-    <label for="end-date" style="font-weight: 500;">End Date:</label>
-    <input type="date" id="end-date" style="padding: 5px; border-radius: 8px; border: 1px solid #ccc;">
-          </div>
-        </div>
+ <!-- Row 1: Interactive Header -->
+<div class="header" style="display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 20px;">
+    
+    <!-- Date Filter Card -->
+    <div class="card" style="flex-direction: row; align-items: center; gap: 15px; padding: 10px 20px;">
+        <label for="start-date" style="font-weight: 500;">Start Date:</label>
+        <input type="date" id="start-date" style="padding: 8px; border-radius: 8px; border: 1px solid #ccc; font-size: 14px;">
+        
+        <label for="end-date" style="font-weight: 500; margin-left: 10px;">End Date:</label>
+        <input type="date" id="end-date" style="padding: 8px; border-radius: 8px; border: 1px solid #ccc; font-size: 14px;">
+    </div>
+
+    <!-- Refresh Button -->
+    <button id="refresh-data-btn" style="padding: 12px 22px; border: 2px solid black; border-radius: 16px; background-image: linear-gradient(to top right, #ffb75e, #ed8f03); color: black; font-weight: bold; font-size: 1em; cursor: pointer; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); transition: all 0.2s ease;">
+        Refresh Data
+    </button>
+
+</div>
 
         <!-- Row 2: Statistics Cards -->
         <div class="row">
@@ -248,22 +258,29 @@
 
     // This function runs when the page is loaded
     document.addEventListener('DOMContentLoaded', () => {
-        // Set up event listeners for the date filter inputs
+        // Set up event listeners for the filter inputs and the new refresh button
         const startDateInput = document.getElementById('start-date');
         const endDateInput = document.getElementById('end-date');
+        const refreshButton = document.getElementById('refresh-data-btn');
 
         startDateInput.addEventListener('change', updateDashboardView);
         endDateInput.addEventListener('change', updateDashboardView);
+        refreshButton.addEventListener('click', loadDashboardData); // Re-fetch all data on click
         
-        loadDashboardData();
+        loadDashboardData(); // Initial data load
     });
 
     /**
      * Main function to fetch, process, and render dashboard data from multiple sources.
-     * This now runs only once on page load.
+     * This now runs on page load and on manual refresh.
      */
     async function loadDashboardData() {
+        const refreshButton = document.getElementById('refresh-data-btn');
         try {
+            // Provide user feedback that data is loading
+            refreshButton.textContent = '🔄 Refreshing...';
+            refreshButton.disabled = true;
+
             // Add a unique timestamp to each URL to bypass browser/network caches.
             const cacheBust = '&_cache_bust=' + new Date().getTime();
 
@@ -298,11 +315,15 @@
             console.error('Error loading dashboard data:', error);
             document.getElementById('total-push').innerText = 'Error';
             document.getElementById('unique-push').innerText = 'Error';
+        } finally {
+            // Restore button state after fetch is complete (or has failed)
+            refreshButton.textContent = 'Refresh Data';
+            refreshButton.disabled = false;
         }
     }
 
     /**
-     * NEW: This function filters the master data and re-renders all charts.
+     * This function filters the master data and re-renders all charts.
      * It's called on page load and whenever a date filter is changed.
      */
     function updateDashboardView() {
@@ -440,7 +461,7 @@
         data.forEach(row => {
             const formattedDate = row['Captured On'];
             if (!formattedDate) return;
-            const mobile = row['Mobile Number']?.replace(/[^0-9]/g, '');
+            const mobile = row['Mobile Number']?.replace(/[^0-g]/g, '');
             if (!dailyData[formattedDate]) {
                 dailyData[formattedDate] = { total: 0, uniqueMobiles: new Set() };
             }
@@ -466,6 +487,7 @@
         });
     }
 </script>
+
 
 </body>
 </html>
