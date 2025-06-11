@@ -261,7 +261,6 @@
         const endDateInput = document.getElementById('end-date');
         const refreshButton = document.getElementById('refresh-data-btn');
 
-        // Robustness Check: Ensure elements exist before adding listeners
         if (startDateInput && endDateInput && refreshButton) {
             startDateInput.addEventListener('change', updateDashboardView);
             endDateInput.addEventListener('change', updateDashboardView);
@@ -278,37 +277,28 @@
      */
     async function loadDashboardData() {
         const refreshButton = document.getElementById('refresh-data-btn');
-        if (webAppUrl === 'PASTE_YOUR_NEW_WEB_APP_URL_HERE') {
-            alert('Please update the script with your new Google Apps Script Web App URL.');
-            return;
-        }
-
         try {
             if(refreshButton) {
                 refreshButton.textContent = '🔄 Refreshing...';
                 refreshButton.disabled = true;
             }
 
-            // Fetch data from our single, real-time API endpoint.
             const response = await fetch(webAppUrl);
-            if (!response.ok) {
-                throw new Error(`Network response was not ok: ${response.statusText}`);
-            }
+            if (!response.ok) throw new Error(`Network response was not ok: ${response.statusText}`);
 
             const data = await response.json();
+            if (data.error) throw new Error(`Error from Apps Script: ${data.error}`);
             
-            if (data.error) {
-                throw new Error(`Error from Apps Script: ${data.error}`);
-            }
-
-            // Store the real-time data in our master variable.
-            masterData = data;
+            // --- ROBUSTNESS FIX ---
+            // Re-normalize dates on the client-side to ensure consistency.
+            // This protects the dashboard from any upstream data formatting errors.
+            masterData = data.map(row => {
+                const validatedDate = validateAndFormatDate(row['Captured On']);
+                return { ...row, 'Captured On': validatedDate };
+            });
             
-            if (masterData.length === 0) {
-                 throw new Error('No data received from the Web App.');
-            }
+            if (masterData.length === 0) throw new Error('No data received from the Web App.');
             
-            // Perform the initial render of the dashboard with all data.
             updateDashboardView();
 
         } catch (error) {
@@ -322,6 +312,30 @@
             }
         }
     }
+    
+    /**
+     * NEW Helper function to validate and re-format dates on the client side.
+     * This ensures all dates are in a consistent YYYY-MM-DD format.
+     * @param {string} dateStr - The date string from the API (which should already be YYYY-MM-DD).
+     * @returns {string|null} - A validated YYYY-MM-DD string, or null.
+     */
+    function validateAndFormatDate(dateStr) {
+        if (!dateStr || typeof dateStr !== 'string') return null;
+        // Attempt to create a date object. This is very flexible and can handle
+        // YYYY-MM-DD, MM/DD/YYYY, etc., but we will re-format it to be safe.
+        const d = new Date(dateStr);
+        // Check if the created date is valid.
+        if (d instanceof Date && !isNaN(d.getTime())) {
+            const year = d.getFullYear();
+            // Add 1 to month because getMonth() is zero-based (0-11).
+            const month = String(d.getMonth() + 1).padStart(2, '0'); 
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+        // Return null if the input string is not a recognizable date.
+        return null;
+    }
+
 
     /**
      * This function filters the master data and re-renders all charts.
@@ -330,7 +344,6 @@
         const startDateInput = document.getElementById('start-date');
         const endDateInput = document.getElementById('end-date');
         
-        // Robustness Check: If elements don't exist, use all data.
         if (!startDateInput || !endDateInput) {
             processAndRenderAll(masterData);
             return;
@@ -338,9 +351,12 @@
         
         const startDate = startDateInput.value;
         const endDate = endDateInput.value;
+        
+        // --- DIAGNOSTIC LOGGING ---
+        console.log(`Filtering data between: Start='${startDate || 'None'}' and End='${endDate || 'None'}'`);
 
         const filteredData = masterData.filter(row => {
-            const rowDate = row['Captured On']; // This is already in YYYY-MM-DD format
+            const rowDate = row['Captured On'];
             if (!rowDate) return false;
 
             const isAfterStartDate = !startDate || rowDate >= startDate;
@@ -348,6 +364,8 @@
             
             return isAfterStartDate && isBeforeEndDate;
         });
+        
+        console.log(`Filtering complete. Showing ${filteredData.length} of ${masterData.length} total records.`);
         
         processAndRenderAll(filteredData);
     }
@@ -362,34 +380,20 @@
         processAndRenderPushTrendChart(data);
     }
     
-    /**
-    * Calculates and displays KPIs, now with added diagnostic logging.
-    */
     function processAndRenderKPIs(data) {
         const totalPushes = data.length;
-        
-        // --- DIAGNOSTIC LOGGING START ---
         console.log("--- Starting Unique Count Diagnosis ---");
         console.log(`Total rows being processed in current view: ${data.length}`);
-
-        // Create a detailed map of all mobile numbers
         const allMobileNumbers = data.map(row => ({
             original: row['Mobile Number'],
             cleaned: String(row['Mobile Number'] || '').replace(/[^0-9]/g, ''),
             name: row['Name'] || 'No Name Provided'
         }));
-
-        // Separate valid numbers from invalid/blank ones
         const validMobileNumbers = allMobileNumbers.filter(num => num.cleaned);
         const invalidOrBlankRows = allMobileNumbers.filter(num => !num.cleaned);
-
-        // Calculate unique count only from the valid numbers
         const uniqueMobileNumbersSet = new Set(validMobileNumbers.map(num => num.cleaned));
         const uniquePushes = uniqueMobileNumbersSet.size;
-
         console.log(`Found ${uniquePushes} unique mobile numbers.`);
-        
-        // If there are invalid rows, log them in a clear table for easy debugging
         if (invalidOrBlankRows.length > 0) {
             console.warn(`WARNING: Found ${invalidOrBlankRows.length} rows with blank or invalid mobile numbers. These are NOT included in the unique count.`);
             console.table(invalidOrBlankRows.map(row => ({ Name: row.name, OriginalMobileEntry: row.original })));
@@ -397,8 +401,6 @@
             console.log("All rows processed had a valid mobile number entry.");
         }
         console.log("--- End of Diagnosis ---");
-        // --- DIAGNOSTIC LOGGING END ---
-        
         document.getElementById('total-push').innerText = totalPushes;
         document.getElementById('unique-push').innerText = uniquePushes;
     }
@@ -450,6 +452,14 @@
         const labels = sortedDates;
         const totalPushData = sortedDates.map(date => dailyData[date].total);
         const uniquePushData = sortedDates.map(date => dailyData[date].uniqueMobiles.size);
+        
+        // --- DIAGNOSTIC LOGGING ---
+        if(labels.length > 0) {
+            console.log("First 5 dates being sent to trend chart:", labels.slice(0, 5));
+        } else {
+            console.log("No valid date data to create trend chart.");
+        }
+
         const ctx = document.getElementById('pushTrendChart').getContext('2d');
         if(window.pushTrendChart instanceof Chart) { window.pushTrendChart.destroy(); }
         window.pushTrendChart = new Chart(ctx, {
