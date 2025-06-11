@@ -261,9 +261,14 @@
         const endDateInput = document.getElementById('end-date');
         const refreshButton = document.getElementById('refresh-data-btn');
 
-        startDateInput.addEventListener('change', updateDashboardView);
-        endDateInput.addEventListener('change', updateDashboardView);
-        refreshButton.addEventListener('click', loadDashboardData);
+        // Robustness Check: Ensure elements exist before adding listeners
+        if (startDateInput && endDateInput && refreshButton) {
+            startDateInput.addEventListener('change', updateDashboardView);
+            endDateInput.addEventListener('change', updateDashboardView);
+            refreshButton.addEventListener('click', loadDashboardData);
+        } else {
+            console.error("Could not find date filter or refresh button elements. Please check your HTML IDs.");
+        }
         
         loadDashboardData(); // Initial data load
     });
@@ -279,8 +284,10 @@
         }
 
         try {
-            refreshButton.textContent = '🔄 Refreshing...';
-            refreshButton.disabled = true;
+            if(refreshButton) {
+                refreshButton.textContent = '🔄 Refreshing...';
+                refreshButton.disabled = true;
+            }
 
             // Fetch data from our single, real-time API endpoint.
             const response = await fetch(webAppUrl);
@@ -309,8 +316,10 @@
             document.getElementById('total-push').innerText = 'Error';
             document.getElementById('unique-push').innerText = 'Error';
         } finally {
-            refreshButton.textContent = 'Refresh Data';
-            refreshButton.disabled = false;
+             if(refreshButton) {
+                refreshButton.textContent = 'Refresh Data';
+                refreshButton.disabled = false;
+            }
         }
     }
 
@@ -320,6 +329,12 @@
     function updateDashboardView() {
         const startDateInput = document.getElementById('start-date');
         const endDateInput = document.getElementById('end-date');
+        
+        // Robustness Check: If elements don't exist, use all data.
+        if (!startDateInput || !endDateInput) {
+            processAndRenderAll(masterData);
+            return;
+        }
         
         const startDate = startDateInput.value;
         const endDate = endDateInput.value;
@@ -334,19 +349,56 @@
             return isAfterStartDate && isBeforeEndDate;
         });
         
-        processAndRenderKPIs(filteredData);
-        processAndRenderLeadsPushedChart(filteredData);
-        processAndRenderLeadCompositionChart(filteredData);
-        processAndRenderPushTrendChart(filteredData);
+        processAndRenderAll(filteredData);
+    }
+
+    /**
+     * Helper function to run all rendering processes.
+     */
+    function processAndRenderAll(data) {
+        processAndRenderKPIs(data);
+        processAndRenderLeadsPushedChart(data);
+        processAndRenderLeadCompositionChart(data);
+        processAndRenderPushTrendChart(data);
     }
     
-    // --- All chart-rendering and KPI functions remain the same, ---
-    // --- but they now receive perfectly formatted JSON data every time. ---
-    
+    /**
+    * Calculates and displays KPIs, now with added diagnostic logging.
+    */
     function processAndRenderKPIs(data) {
         const totalPushes = data.length;
-        const mobileNumbers = new Set(data.map(row => String(row['Mobile Number'] || '').replace(/[^0-9]/g, '')).filter(Boolean));
-        const uniquePushes = mobileNumbers.size;
+        
+        // --- DIAGNOSTIC LOGGING START ---
+        console.log("--- Starting Unique Count Diagnosis ---");
+        console.log(`Total rows being processed in current view: ${data.length}`);
+
+        // Create a detailed map of all mobile numbers
+        const allMobileNumbers = data.map(row => ({
+            original: row['Mobile Number'],
+            cleaned: String(row['Mobile Number'] || '').replace(/[^0-9]/g, ''),
+            name: row['Name'] || 'No Name Provided'
+        }));
+
+        // Separate valid numbers from invalid/blank ones
+        const validMobileNumbers = allMobileNumbers.filter(num => num.cleaned);
+        const invalidOrBlankRows = allMobileNumbers.filter(num => !num.cleaned);
+
+        // Calculate unique count only from the valid numbers
+        const uniqueMobileNumbersSet = new Set(validMobileNumbers.map(num => num.cleaned));
+        const uniquePushes = uniqueMobileNumbersSet.size;
+
+        console.log(`Found ${uniquePushes} unique mobile numbers.`);
+        
+        // If there are invalid rows, log them in a clear table for easy debugging
+        if (invalidOrBlankRows.length > 0) {
+            console.warn(`WARNING: Found ${invalidOrBlankRows.length} rows with blank or invalid mobile numbers. These are NOT included in the unique count.`);
+            console.table(invalidOrBlankRows.map(row => ({ Name: row.name, OriginalMobileEntry: row.original })));
+        } else {
+            console.log("All rows processed had a valid mobile number entry.");
+        }
+        console.log("--- End of Diagnosis ---");
+        // --- DIAGNOSTIC LOGGING END ---
+        
         document.getElementById('total-push').innerText = totalPushes;
         document.getElementById('unique-push').innerText = uniquePushes;
     }
