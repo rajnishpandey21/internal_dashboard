@@ -303,6 +303,17 @@
   background-color: #fff;
 }
 
+/* This makes the stat cards look clickable */
+.stat-card.clickable {
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.stat-card.clickable:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 15px rgba(0, 0, 0, 0.2);
+}
+
   </style>
 </head>
 
@@ -325,32 +336,36 @@
       <button id="refresh-data-btn" class="refresh-button">Refresh Data</button>
     </div>
 
-    <div class="row fixed-row">
-      <div class="card stat-card">
-        <h3>Total Push To ERP</h3>
-        <p id="total-push" class="number">...</p>
-      </div>
-      <div class="card stat-card">
-        <h3>Unique Push To ERP</h3>
-        <p id="unique-push" class="number">...</p>
-      </div>
-      <div class="card stat-card">
-        <h3>Total Applications</h3>
-        <p id="total-apps" class="number">-</p>
-      </div>
-      <div class="card stat-card">
-        <h3>Primary Applications</h3>
-        <p id="primary-apps" class="number">-</p>
-      </div>
-      <div class="card stat-card">
-        <h3>Total Admissions</h3>
-        <p id="total-admissions" class="number">-</p>
-      </div>
-      <div class="card stat-card">
-        <h3>Payout</h3>
-        <p id="payout" class="number">₹3,50,999</p>
-      </div>
-    </div>
+<div class="row fixed-row">
+  <div id="total-push-card" class="card stat-card">
+    <h3>Total Push To ERP</h3>
+    <p id="total-push" class="number">...</p>
+  </div>
+  <div id="unique-push-card" class="card stat-card">
+    <h3>Unique Push To ERP</h3>
+    <p id="unique-push" class="number">...</p>
+  </div>
+  <div id="total-apps-card" class="card stat-card">
+    <h3>Total Applications</h3>
+    <p id="total-apps" class="number">-</p>
+  </div>
+  <div id="primary-apps-card" class="card stat-card">
+    <h3>Primary Applications</h3>
+    <p id="primary-apps" class="number">-</p>
+  </div>
+  <div id="total-admissions-card" class="card stat-card">
+    <h3>Total Admissions</h3>
+    <p id="total-admissions" class="number">-</p>
+  </div>
+  <div id="primary-admissions-card" class="card stat-card">
+    <h3>Primary Admissions</h3>
+    <p id="primary-admissions" class="number">-</p>
+  </div>
+  <div id="payout-card" class="card stat-card">
+    <h3>Payout</h3>
+    <p id="payout" class="number">3.57 cr</p>
+  </div>
+</div>
 
     <div class="row flexible-row">
       <div class="card chart-card chart-col-4">
@@ -418,6 +433,7 @@
   const webAppUrl = 'https://script.google.com/macros/s/AKfycbwOmQyYZ2jcwNf6zNDMtiA2giXbwWMu4GmmGNw9fFNkEGnIuzRC3pwDiHyjSixxj9lR/exec';
   let masterData = [];
   let modalChart = null;
+  let currentlyFilteredData = [];
 
 document.addEventListener('DOMContentLoaded', () => {
   const startDateInput = document.getElementById('start-date');
@@ -437,7 +453,38 @@ document.addEventListener('DOMContentLoaded', () => {
   } else {
     console.error("Missing date inputs or refresh button.");
   }
+// --- ADD THIS NEW, IMPROVED BLOCK ---
+// List of all the card IDs we want to make clickable.
+const clickableCardIds = [
+  'total-push-card',
+  'unique-push-card',
+  'total-apps-card',
+  'primary-apps-card',
+  'total-admissions-card',
+  'primary-admissions-card',
+  'payout-card'
+];
 
+// Loop through each ID and make the corresponding card clickable.
+clickableCardIds.forEach(id => {
+  const card = document.getElementById(id);
+  if (card) {
+    card.classList.add('clickable');
+    card.addEventListener('click', () => {
+      // For now, we'll just handle the first two.
+      // We can add logic for the others later.
+      if (id === 'total-push-card') {
+        showLeadDetails('total');
+      } else if (id === 'unique-push-card') {
+        showLeadDetails('unique');
+      } else {
+        // For the other cards, just show a temporary alert.
+        alert('Details for this KPI are coming soon!');
+      }
+    });
+  }
+});
+// --- END OF THE NEW BLOCK ---
   setupModalListeners();
   loadDashboardData();
 });
@@ -460,8 +507,8 @@ async function loadDashboardData() {
     masterData = data;
     if (!masterData.length) throw new Error('No data received.');
 
-populateCollegeDropdown(masterData); // ✅ Populate dropdown
-updateDashboardView();               // ✅ Render filtered dashboard
+  populateCollegeDropdown(masterData); 
+  updateDashboardView();               
 
     updateDashboardView();
   } catch (error) {
@@ -514,7 +561,7 @@ function updateDashboardView() {
 
     return dateMatch && collegeMatch;
   });
-
+  currentlyFilteredData = filteredData;
   processAndRenderAll(filteredData);
 }
 
@@ -552,7 +599,7 @@ function processAndRenderLeadsPushedChart(data) {
     console.log(`Found ${labels.length} labels for the chart.`);
 
     const canvas = document.getElementById('leadsPushedChart');
-    const container = canvas.parentElement; // The .chart-container div
+    const container = canvas.parentElement;
     const ctx = canvas.getContext('2d');
 
     if (window.leadsPushedChart instanceof Chart) {
@@ -689,6 +736,57 @@ function processAndRenderPushTrendChart(data) {
       plugins: { legend: { position: 'top' } }
     }
   });
+}
+
+/**
+ * This function prepares the lead data and opens the new details page.
+ * It decides whether to send all leads or only unique ones.
+ */
+function showLeadDetails(dataType) {
+  let dataToShow = [];
+
+  // These are the only columns we need for the new page.
+  const requiredColumns = [
+    'Name', 
+    'Email Address', 
+    'Mobile Number', 
+    'Captured On', 
+    'Opportunity: University Interested In', 
+    'Opportunity: Course Interested In', 
+    'Specialization'
+  ];
+
+  // First, we simplify our data to only include the columns we need.
+  const relevantData = currentlyFilteredData.map(fullRow => {
+    let newRow = {};
+    for (const col of requiredColumns) {
+      newRow[col] = fullRow[col] || ''; // Use an empty string if data is missing
+    }
+    return newRow;
+  });
+
+  // If the user clicked "Unique Push", we filter out the duplicates.
+  if (dataType === 'unique') {
+    const uniqueMobiles = new Set(); // A set only allows unique values
+    dataToShow = relevantData.filter(row => {
+      const mobile = row['Mobile Number'].replace(/\D/g, '');
+      if (mobile && !uniqueMobiles.has(mobile)) {
+        uniqueMobiles.add(mobile); // Add the mobile number to the set
+        return true; // Keep this row
+      }
+      return false; // Skip this duplicate row
+    });
+  } else {
+    // If the user clicked "Total Push", we use all the relevant data.
+    dataToShow = relevantData;
+  }
+
+  // IMPORTANT: We store the data in the browser's temporary memory (sessionStorage)
+  // so the new page can access it. Think of it like a temporary sticky note.
+  sessionStorage.setItem('leadsData', JSON.stringify(dataToShow));
+
+  // Finally, we open the new page in a new tab.
+  window.open('leads_details.html', '_blank');
 }
 
 // --------- Modal Chart Logic (with scroll enhancement) ---------
