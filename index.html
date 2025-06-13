@@ -292,6 +292,17 @@
       background-color: #999;
       border-radius: 4px;
     }
+
+    select.college-dropdown {
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  font-size: 14px;
+  min-width: 180px;
+  appearance: none;
+  background-color: #fff;
+}
+
   </style>
 </head>
 
@@ -303,6 +314,13 @@
         <input type="date" id="start-date" />
         <label for="end-date">End Date:</label>
         <input type="date" id="end-date" />
+
+        <label for="college-select">College:</label>
+<select id="college-select" class="college-dropdown">
+  <option value="__ALL__">All Colleges</option>
+</select>
+
+
       </div>
       <button id="refresh-data-btn" class="refresh-button">Refresh Data</button>
     </div>
@@ -397,7 +415,7 @@
 
 
 <script>
-  const webAppUrl = 'https://script.google.com/macros/s/AKfycbzz98FTgALCN1EFvqA6koJKeVsdA_jJPmHeBlvEZbz-vTkh9LJEb2whXt9aEKXWyEs/exec';
+  const webAppUrl = 'https://script.google.com/macros/s/AKfycbwOmQyYZ2jcwNf6zNDMtiA2giXbwWMu4GmmGNw9fFNkEGnIuzRC3pwDiHyjSixxj9lR/exec';
   let masterData = [];
   let modalChart = null;
 
@@ -410,6 +428,12 @@ document.addEventListener('DOMContentLoaded', () => {
     startDateInput.addEventListener('change', updateDashboardView);
     endDateInput.addEventListener('change', updateDashboardView);
     refreshButton.addEventListener('click', loadDashboardData);
+
+    // ✅ NEW: Add listener for college dropdown
+    const collegeSelect = document.getElementById('college-select');
+    if (collegeSelect) {
+      collegeSelect.addEventListener('change', updateDashboardView);
+    }
   } else {
     console.error("Missing date inputs or refresh button.");
   }
@@ -417,6 +441,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupModalListeners();
   loadDashboardData();
 });
+
 
 async function loadDashboardData() {
   const refreshButton = document.getElementById('refresh-data-btn');
@@ -435,6 +460,9 @@ async function loadDashboardData() {
     masterData = data;
     if (!masterData.length) throw new Error('No data received.');
 
+populateCollegeDropdown(masterData); // ✅ Populate dropdown
+updateDashboardView();               // ✅ Render filtered dashboard
+
     updateDashboardView();
   } catch (error) {
     console.error('Dashboard loading error:', error);
@@ -448,9 +476,29 @@ async function loadDashboardData() {
   }
 }
 
+function populateCollegeDropdown(data) {
+  const collegeSelect = document.getElementById('college-select');
+  if (!collegeSelect) return;
+
+  // Get unique college names
+  const colleges = [...new Set(data.map(row => row['Opportunity: University Interested In']).filter(Boolean))];
+  colleges.sort(); // Sort alphabetically
+
+  // Reset dropdown
+  collegeSelect.innerHTML = '<option value="__ALL__">All Colleges</option>';
+  colleges.forEach(name => {
+    const opt = document.createElement('option');
+    opt.value = name;
+    opt.textContent = name;
+    collegeSelect.appendChild(opt);
+  });
+}
+
+
 function updateDashboardView() {
   const startDate = document.getElementById('start-date')?.value;
   let endDate = document.getElementById('end-date')?.value;
+  const selectedCollege = document.getElementById('college-select')?.value;
 
   if (startDate && !endDate) {
     endDate = new Date().toISOString().split('T')[0];
@@ -458,12 +506,18 @@ function updateDashboardView() {
 
   const filteredData = masterData.filter(row => {
     const date = row['Captured On'];
+    const college = row['Opportunity: University Interested In'];
     if (!date) return false;
-    return (!startDate || date >= startDate) && (!endDate || date <= endDate);
+
+    const dateMatch = (!startDate || date >= startDate) && (!endDate || date <= endDate);
+    const collegeMatch = (selectedCollege === '__ALL__') || (college === selectedCollege);
+
+    return dateMatch && collegeMatch;
   });
 
   processAndRenderAll(filteredData);
 }
+
 
 function processAndRenderAll(data) {
   processAndRenderKPIs(data);
