@@ -1,6 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+
+<link rel="icon" href="my-favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="my-favicon.png">
+
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Lead Details</title>
@@ -152,10 +156,10 @@
       // Pagination variables
       let allLeads = [];
       let currentPage = 1;
-      const rowsPerPage = 20;
+      const rowsPerPage = 50;
 
       // 1. Get data from browser's temporary memory
-      const dataString = sessionStorage.getItem('leadsData');
+      const dataString = sessionStorage.getItem('detailsData');
       
       if (!dataString) {
         actionsContainer.style.display = 'none'; // Hide buttons if no data
