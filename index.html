@@ -1,6 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+
+  <link rel="icon" href="my-favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="my-favicon.png">
+
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>CareerKaptain Internal - Dynamic Dashboard</title>
@@ -51,7 +55,7 @@
       padding: 15px;
       display: flex;
       flex-direction: column;
-      position: relative;
+      position: relative; /* This is crucial for the loading overlay */
     }
 
     .row {
@@ -62,6 +66,7 @@
 
     .row.fixed-row {
       flex: 0 0 auto;
+      align-items: center;
     }
 
     .row.flexible-row {
@@ -74,12 +79,14 @@
       min-height: 0;
     }
 
-    .header-card {
-      flex-direction: row;
-      align-items: center;
-      gap: 15px;
-      padding: 10px 20px;
-    }
+.header-card {
+  flex-direction: row;
+  align-items: center;
+  gap: 15px;
+  padding: 10px 20px;
+  flex: 1; /* A shorthand for grow and shrink */
+  min-width: 0;
+}
 
     .header-card label {
       font-weight: 500;
@@ -113,6 +120,11 @@
       cursor: not-allowed;
       opacity: 0.7;
     }
+
+    .export-master-btn {
+    background-image: linear-gradient(to top right, #4a90e2, #0052a2); /* A distinct blue gradient */
+    color: white;
+}
 
     .stat-card {
       flex: 1;
@@ -148,13 +160,15 @@
       flex-shrink: 0;
     }
 
-.chart-container {
+    .chart-container {
   position: relative;
   flex-grow: 1;
   width: 100%;
-  height: 350px; /* THE FIX: A fixed height removes ambiguity */
+  height: 350px;
   overflow-y: auto;
   overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: #888 #eee;
 }
 
 
@@ -176,6 +190,7 @@
       align-items: center;
       justify-content: center;
       transition: background-color 0.2s ease;
+      z-index: 5; /* Ensure it's above the chart but below the loader */
     }
 
     .expand-btn:hover {
@@ -206,18 +221,16 @@
       display: flex;
     }
 
-/* Find and update this rule in your CSS */
-.modal-content {
-  background-color: white;
-  padding: 20px;
-  border-radius: 16px;
-  width: 90vw;
-  height: 85vh;
-  display: flex;
-  flex-direction: column;
-  position: relative;
-  /* The "overflow: hidden;" line MUST be removed */
-}
+    .modal-content {
+      background-color: white;
+      padding: 20px;
+      border-radius: 16px;
+      width: 90vw;
+      height: 85vh;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
 
     .modal-close-btn {
       position: absolute;
@@ -229,59 +242,23 @@
       cursor: pointer;
       color: #555;
       transition: color 0.2s ease;
+      z-index: 10;
     }
 
     .modal-close-btn:hover {
       color: #000;
     }
 
-/* Find and update this rule in your CSS */
-.modal-chart-container {
-  width: 100%;
-  flex-grow: 1;
-  overflow-y: auto;
-  overflow-x: auto;
-  /* The "height: 100%;" line has been removed */
-}
+    .modal-chart-container {
+      width: 100%;
+      flex-grow: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
 
     #modalCanvas {
       width: 100% !important;
       display: block;
-    }
-
-    @media (max-width: 1200px) {
-      :root {
-        --gap: 10px;
-      }
-
-      .stat-card .number {
-        font-size: 1.5em;
-      }
-
-      .stat-card h3 {
-        font-size: 0.75em;
-      }
-    }
-
-    @media (max-width: 992px) {
-      html, body {
-        height: auto;
-        overflow: auto;
-      }
-
-      .row {
-        flex-wrap: wrap;
-      }
-
-      .header-card {
-        flex-wrap: wrap;
-        justify-content: center;
-      }
-    }
-
-    .chart-container {
-      scrollbar-width: thin;
-      scrollbar-color: #888 #eee;
     }
 
     .chart-container::-webkit-scrollbar {
@@ -298,22 +275,98 @@
   border-radius: 8px;
   border: 1px solid #ccc;
   font-size: 14px;
-  min-width: 180px;
   appearance: none;
   background-color: #fff;
+  flex: 1;       /* ADD THIS: Makes the dropdown flexible to grow and shrink */
+  min-width: 95px; /* CHANGE THIS: Use a smaller, more reasonable minimum width */
 }
 
-/* This makes the stat cards look clickable */
-.stat-card.clickable {
-  cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+    .stat-card.clickable {
+      cursor: pointer;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .stat-card.clickable:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 15px rgba(0, 0, 0, 0.2);
+    }
+    
+    /* --- START: Loading Spinner Styles --- */
+    .card .loading-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(255, 255, 255, 0.7); /* White, slightly transparent */
+      border-radius: 16px; /* Match the card's border-radius */
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+      opacity: 0; /* Hidden by default */
+      pointer-events: none; /* Cannot be clicked */
+      transition: opacity 0.3s ease;
+    }
+
+    .card .loading-overlay.visible {
+      opacity: 1; /* Make it visible */
+      pointer-events: auto; /* Can block clicks on the card while loading */
+    }
+
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 4px solid rgba(0, 0, 0, 0.1);
+      border-left-color: #ed8f03; /* Use your theme's orange color */
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+    /* --- END: Loading Spinner Styles --- */
+
+    @media (max-width: 1200px) {
+      :root {
+        --gap: 10px;
+      }
+      .stat-card .number {
+        font-size: 1.5em;
+      }
+      .stat-card h3 {
+        font-size: 0.75em;
+      }
+    }
+
+    @media (max-width: 992px) {
+      html, body {
+        height: auto;
+        overflow: auto;
+      }
+      .row {
+        flex-wrap: wrap;
+      }
+      .header-card {
+        flex-wrap: wrap;
+        justify-content: center;
+      }
+    }
+
+    .export-daywise-btn {
+    background-image: linear-gradient(to top right, #6d3f9c, #4a2b6e); /* A deep purple gradient */
+    color: white;
 }
 
-.stat-card.clickable:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 8px 15px rgba(0, 0, 0, 0.2);
+/* ADD THIS NEW RULE */
+.header-button-group {
+  display: flex;
+  gap: var(--gap);
+  flex-shrink: 0; /* This is the magic: prevents the buttons from shrinking */
 }
-
   </style>
 </head>
 
@@ -327,100 +380,108 @@
         <input type="date" id="end-date" />
 
         <label for="college-select">College:</label>
-<select id="college-select" class="college-dropdown">
-  <option value="__ALL__">All Colleges</option>
-</select>
-
-
+        <select id="college-select" class="college-dropdown">
+          <option value="__ALL__">All Colleges</option>
+        </select>
       </div>
+       <div class="header-button-group">
+      <button id="export-master-btn" class="refresh-button export-master-btn">Export Master Report</button>
+      <button id="export-daywise-btn" class="refresh-button export-daywise-btn">Export Day-wise Push</button>
       <button id="refresh-data-btn" class="refresh-button">Refresh Data</button>
+      </div>
     </div>
 
-<div class="row fixed-row">
+    <div class="row fixed-row">
   <div id="total-push-card" class="card stat-card">
+    <div class="loading-overlay"><div class="spinner"></div></div>
     <h3>Total Push To ERP</h3>
     <p id="total-push" class="number">...</p>
   </div>
   <div id="unique-push-card" class="card stat-card">
+    <div class="loading-overlay"><div class="spinner"></div></div>
     <h3>Unique Push To ERP</h3>
     <p id="unique-push" class="number">...</p>
   </div>
   <div id="total-apps-card" class="card stat-card">
+    <div class="loading-overlay"><div class="spinner"></div></div>
     <h3>Total Applications</h3>
     <p id="total-apps" class="number">-</p>
   </div>
   <div id="primary-apps-card" class="card stat-card">
+    <div class="loading-overlay"><div class="spinner"></div></div>
     <h3>Primary Applications</h3>
     <p id="primary-apps" class="number">-</p>
   </div>
   <div id="total-admissions-card" class="card stat-card">
+    <div class="loading-overlay"><div class="spinner"></div></div>
     <h3>Total Admissions</h3>
     <p id="total-admissions" class="number">-</p>
   </div>
   <div id="primary-admissions-card" class="card stat-card">
+    <div class="loading-overlay"><div class="spinner"></div></div>
     <h3>Primary Admissions</h3>
     <p id="primary-admissions" class="number">-</p>
   </div>
   <div id="payout-card" class="card stat-card">
+    <div class="loading-overlay"><div class="spinner"></div></div>
     <h3>Payout</h3>
     <p id="payout" class="number">3.57 cr</p>
   </div>
 </div>
 
-    <div class="row flexible-row">
-      <div class="card chart-card chart-col-4">
-        <button class="expand-btn" data-chart-id="leadsPushedChart">
-          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </button>
-        <h3>Leads Pushed by University</h3>
-        <div class="chart-container">
-          <canvas id="leadsPushedChart"></canvas>
-        </div>
-      </div>
-      <div class="card chart-card chart-col-4">
-        <h3>Primary Applications</h3>
-        <div class="chart-container">
-          <p style="text-align: center; padding-top: 20px;">Chart coming soon...</p>
-        </div>
-      </div>
-      <div class="card chart-card chart-col-4">
-        <h3>Primary Admissions</h3>
-        <div class="chart-container">
-          <p style="text-align: center; padding-top: 20px;">Chart coming soon...</p>
-        </div>
-      </div>
-      <div class="card chart-card chart-col-4">
-        <h3>Lead Composition</h3>
-        <div class="chart-container">
-          <canvas id="leadCompositionChart"></canvas>
-        </div>
-      </div>
-    </div>
-
-    <div class="row flexible-row-large">
-      <div class="card chart-card">
-        <button class="expand-btn" data-chart-id="pushTrendChart">
-          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </button>
-        <h3>Push to ERP and Unique Trend</h3>
-        <div class="chart-container">
-          <canvas id="pushTrendChart"></canvas>
-        </div>
-      </div>
+   <div class="row flexible-row">
+  <div id="leadsPushedChartCard" class="card chart-card chart-col-4">
+    <button class="expand-btn" data-chart-id="leadsPushedChart">
+      <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <h3>Leads Pushed by University</h3>
+    <div class="chart-container">
+      <canvas id="leadsPushedChart"></canvas>
     </div>
   </div>
+  <div id="primaryAppsChartCard" class="card chart-card chart-col-4">
+    <button class="expand-btn" data-chart-id="primaryAppsChart">
+       <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <h3>Primary Applications</h3>
+    <div class="chart-container">
+       <canvas id="primaryAppsChart"></canvas>
+    </div>
+  </div>
+  <div id="primaryAdmissionsChartCard" class="card chart-card chart-col-4">
+     <button class="expand-btn" data-chart-id="primaryAdmissionsChart">
+       <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <h3>Primary Admissions</h3>
+    <div class="chart-container">
+       <canvas id="primaryAdmissionsChart"></canvas>
+    </div>
+  </div>
+  <div id="leadCompositionChartCard" class="card chart-card chart-col-4">
+    <h3>Lead Composition</h3>
+    <div class="chart-container">
+      <canvas id="leadCompositionChart"></canvas>
+    </div>
+  </div>
+</div>
+<div class="row flexible-row-large">
+  <div id="pushTrendChartCard" class="card chart-card">
+    <button class="expand-btn" data-chart-id="pushTrendChart">
+      <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <h3>Push to ERP and Unique Trend</h3>
+    <div class="chart-container">
+      <canvas id="pushTrendChart"></canvas>
+    </div>
+  </div>
+</div>
+  </div>
 
-  <!-- Modal -->
   <div id="chartModal" class="modal">
     <div class="modal-content">
-      <span class="modal-close-btn">&times;</span>
+      <button class="modal-close-btn" aria-label="Close modal">&times;</button>
       <div id="modalChartContainer" class="modal-chart-container">
-        <!-- Dynamic canvas goes here -->
-      </div>
+        </div>
     </div>
   </div>
 
@@ -428,446 +489,625 @@
 <script src="https://cdn.jsdelivr.net/npm/date-fns@2.30.0/cdn.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
 
-
 <script>
-  const webAppUrl = 'https://script.google.com/macros/s/AKfycbwOmQyYZ2jcwNf6zNDMtiA2giXbwWMu4GmmGNw9fFNkEGnIuzRC3pwDiHyjSixxj9lR/exec';
-  let masterData = [];
-  let modalChart = null;
-  let currentlyFilteredData = [];
+const DashboardApp = {
+    webAppUrl: 'https://script.google.com/macros/s/AKfycbw9gaeVdzXMxP4VKADRRPFMLXHKXhzJGPA33qfoQAyUIP5lgxkOA7xCkMBAZsps5vaG/exec',
 
-document.addEventListener('DOMContentLoaded', () => {
-  const startDateInput = document.getElementById('start-date');
-  const endDateInput = document.getElementById('end-date');
-  const refreshButton = document.getElementById('refresh-data-btn');
+    // Raw data from the backend
+    masterData: {
+        push: [],
+        totalApplications: [],
+        primaryApplications: [],
+        totalAdmissions: [],
+        primaryAdmissions: [],
+    },
 
-  if (startDateInput && endDateInput && refreshButton) {
-    startDateInput.addEventListener('change', updateDashboardView);
-    endDateInput.addEventListener('change', updateDashboardView);
-    refreshButton.addEventListener('click', loadDashboardData);
+    // Data that matches the date/college filters
+    filteredData: {
+        push: [],
+        totalApplications: [],
+        primaryApplications: [],
+        totalAdmissions: [],
+        primaryAdmissions: [],
+    },
 
-    // ✅ NEW: Add listener for college dropdown
+    // To store all chart instances
+    charts: {},
+    modalChart: null,
+
+    // =========================================================================
+    // INITIALIZATION
+    // =========================================================================
+    init() {
+        // The single entry point for the application
+        document.addEventListener('DOMContentLoaded', () => {
+            this.setupEventListeners();
+            this.loadDashboardData();
+        });
+    },
+
+// Replace your existing setupEventListeners function with this one
+setupEventListeners() {
+    // Get all the button elements
+    const startDateInput = document.getElementById('start-date');
+    const endDateInput = document.getElementById('end-date');
+    const refreshButton = document.getElementById('refresh-data-btn');
     const collegeSelect = document.getElementById('college-select');
-    if (collegeSelect) {
-      collegeSelect.addEventListener('change', updateDashboardView);
-    }
-  } else {
-    console.error("Missing date inputs or refresh button.");
-  }
-// --- ADD THIS NEW, IMPROVED BLOCK ---
-// List of all the card IDs we want to make clickable.
-const clickableCardIds = [
-  'total-push-card',
-  'unique-push-card',
-  'total-apps-card',
-  'primary-apps-card',
-  'total-admissions-card',
-  'primary-admissions-card',
-  'payout-card'
-];
+    const exportMasterButton = document.getElementById('export-master-btn');
+    const exportDayWiseButton = document.getElementById('export-daywise-btn');
 
-// Loop through each ID and make the corresponding card clickable.
-clickableCardIds.forEach(id => {
-  const card = document.getElementById(id);
-  if (card) {
-    card.classList.add('clickable');
-    card.addEventListener('click', () => {
-      // For now, we'll just handle the first two.
-      // We can add logic for the others later.
-      if (id === 'total-push-card') {
-        showLeadDetails('total');
-      } else if (id === 'unique-push-card') {
-        showLeadDetails('unique');
-      } else {
-        // For the other cards, just show a temporary alert.
-        alert('Details for this KPI are coming soon!');
-      }
+    // Filter listeners
+    startDateInput.addEventListener('change', () => this.updateDashboardView());
+    endDateInput.addEventListener('change', () => this.updateDashboardView());
+    collegeSelect.addEventListener('change', () => this.updateDashboardView());
+    
+    // Button listeners
+    refreshButton.addEventListener('click', () => this.loadDashboardData());
+    exportMasterButton.addEventListener('click', () => this.exportMasterReport());
+    exportDayWiseButton.addEventListener('click', () => this.exportDayWisePushReport());
+    
+    // --- START: Restore Missing Listeners ---
+
+    // Modal listeners (close button, background click)
+    const modal = document.getElementById('chartModal');
+    const closeBtn = modal.querySelector('.modal-close-btn');
+    if (closeBtn) closeBtn.addEventListener('click', () => this.closeChartModal());
+    modal.addEventListener('click', e => {
+        if (e.target === modal) this.closeChartModal();
     });
-  }
-});
-// --- END OF THE NEW BLOCK ---
-  setupModalListeners();
-  loadDashboardData();
-});
 
-
-async function loadDashboardData() {
-  const refreshButton = document.getElementById('refresh-data-btn');
-  try {
-    if (refreshButton) {
-      refreshButton.textContent = '🔄 Refreshing...';
-      refreshButton.disabled = true;
-    }
-
-    const response = await fetch(webAppUrl);
-    if (!response.ok) throw new Error(`Network error: ${response.statusText}`);
-
-    const data = await response.json();
-    if (data.error) throw new Error(`Script error: ${JSON.stringify(data.error)}`);
-
-    masterData = data;
-    if (!masterData.length) throw new Error('No data received.');
-
-  populateCollegeDropdown(masterData); 
-  updateDashboardView();               
-
-    updateDashboardView();
-  } catch (error) {
-    console.error('Dashboard loading error:', error);
-    document.getElementById('total-push').innerText = 'Error';
-    document.getElementById('unique-push').innerText = 'Error';
-  } finally {
-    if (refreshButton) {
-      refreshButton.textContent = 'Refresh Data';
-      refreshButton.disabled = false;
-    }
-  }
-}
-
-function populateCollegeDropdown(data) {
-  const collegeSelect = document.getElementById('college-select');
-  if (!collegeSelect) return;
-
-  // Get unique college names
-  const colleges = [...new Set(data.map(row => row['Opportunity: University Interested In']).filter(Boolean))];
-  colleges.sort(); // Sort alphabetically
-
-  // Reset dropdown
-  collegeSelect.innerHTML = '<option value="__ALL__">All Colleges</option>';
-  colleges.forEach(name => {
-    const opt = document.createElement('option');
-    opt.value = name;
-    opt.textContent = name;
-    collegeSelect.appendChild(opt);
-  });
-}
-
-
-function updateDashboardView() {
-  const startDate = document.getElementById('start-date')?.value;
-  let endDate = document.getElementById('end-date')?.value;
-  const selectedCollege = document.getElementById('college-select')?.value;
-
-  if (startDate && !endDate) {
-    endDate = new Date().toISOString().split('T')[0];
-  }
-
-  const filteredData = masterData.filter(row => {
-    const date = row['Captured On'];
-    const college = row['Opportunity: University Interested In'];
-    if (!date) return false;
-
-    const dateMatch = (!startDate || date >= startDate) && (!endDate || date <= endDate);
-    const collegeMatch = (selectedCollege === '__ALL__') || (college === selectedCollege);
-
-    return dateMatch && collegeMatch;
-  });
-  currentlyFilteredData = filteredData;
-  processAndRenderAll(filteredData);
-}
-
-
-function processAndRenderAll(data) {
-  processAndRenderKPIs(data);
-  processAndRenderLeadsPushedChart(data);
-  processAndRenderLeadCompositionChart(data);
-  processAndRenderPushTrendChart(data);
-}
-
-// --------- KPIs ---------
-function processAndRenderKPIs(data) {
-  const total = data.length;
-  const unique = new Set(data.map(row => (row['Mobile Number'] || '').replace(/\D/g, ''))).size;
-  document.getElementById('total-push').innerText = total;
-  document.getElementById('unique-push').innerText = unique;
-}
-
-// --------- Leads Pushed Chart ---------
-function processAndRenderLeadsPushedChart(data) {
-  // Use a small delay to allow the browser's flexbox layout to settle first.
-  setTimeout(() => {
-    console.group('--- Debugging Main Dashboard Chart (Delayed) ---');
-
-    const counts = data.reduce((acc, row) => {
-      const univ = row['Opportunity: University Interested In'];
-      if (univ) acc[univ] = (acc[univ] || 0) + 1;
-      return acc;
-    }, {});
-
-    const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
-    const labels = sorted.map(([k]) => k);
-    const values = sorted.map(([, v]) => v);
-    console.log(`Found ${labels.length} labels for the chart.`);
-
-    const canvas = document.getElementById('leadsPushedChart');
-    const container = canvas.parentElement;
-    const ctx = canvas.getContext('2d');
-
-    if (window.leadsPushedChart instanceof Chart) {
-      window.leadsPushedChart.destroy();
-    }
-
-    // 1. Measure the container's width AFTER the delay
-    const containerWidth = container.clientWidth;
-    console.log(`Measured final container width: ${containerWidth}px`);
-
-    // 2. Calculate the required height
-    const barHeight = 30;
-    const newCanvasHeight = labels.length * barHeight;
-    console.log(`Calculated required canvas height: ${newCanvasHeight}px`);
-
-    // 3. Set the canvas attributes directly
-    canvas.width = containerWidth;
-    canvas.height = newCanvasHeight;
-    canvas.style.width = `${containerWidth}px`;
-    canvas.style.height = `${newCanvasHeight}px`;
-
-    // 4. Create the chart with the final, correct dimensions
-    window.leadsPushedChart = new Chart(ctx, {
-      type: 'bar',
-      data: {
-        labels,
-        datasets: [{
-          label: 'Leads Pushed',
-          data: values,
-          backgroundColor: 'rgba(237, 143, 3, 0.7)',
-          borderColor: 'rgba(237, 143, 3, 1)',
-          borderWidth: 1,
-          barThickness: 20,
-          maxBarThickness: 24,
-        }]
-      },
-      options: {
-        indexAxis: 'y',
-        responsive: false,
-        maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        layout: { padding: 10 },
-        scales: {
-          x: { beginAtZero: true, ticks: { precision: 0 } },
-          y: { ticks: { autoSkip: false, maxRotation: 0, minRotation: 0 } }
+    // Modal listener (expand buttons using event delegation)
+    document.querySelector('.dashboard-container').addEventListener('click', (e) => {
+        const expandBtn = e.target.closest('.expand-btn');
+        if (expandBtn) {
+            const chartId = expandBtn.dataset.chartId;
+            const chartInstance = this.charts[chartId];
+            if (chartInstance) {
+                this.openChartModal(chartInstance);
+            } else {
+                alert('Chart is not available to expand.');
+            }
         }
-      }
     });
-    console.log('Final chart instance created with correct width.');
-    console.groupEnd();
-  }, 100); // A 100ms delay is usually sufficient for the layout to complete.
-}
+    
+    // THIS IS THE LINE THAT FIXES YOUR PROBLEM
+    this.setupClickableKpis(); 
 
-// --------- Lead Composition Chart ---------
-function processAndRenderLeadCompositionChart(data) {
-  const total = data.length;
-  const unique = new Set(data.map(row => (row['Mobile Number'] || '').replace(/\D/g, ''))).size;
-  const duplicates = total - unique;
+    // --- END: Restore Missing Listeners ---
+},
+    // =========================================================================
+    // DATA FETCHING & HANDLING
+    // =========================================================================
+    async loadDashboardData() {
+        const refreshButton = document.getElementById('refresh-data-btn');
+        try {
+            if (refreshButton) {
+                refreshButton.textContent = '🔄 Refreshing...';
+                refreshButton.disabled = true;
+            }
+            document.querySelectorAll('.card[id]').forEach(card => this.showLoader(card.id));
 
-  const ctx = document.getElementById('leadCompositionChart').getContext('2d');
-  if (window.leadCompositionChart instanceof Chart) window.leadCompositionChart.destroy();
+            const response = await fetch(this.webAppUrl);
+            if (!response.ok) throw new Error(`Network error: ${response.statusText}`);
 
-  window.leadCompositionChart = new Chart(ctx, {
-    type: 'doughnut',
-    data: {
-      labels: ['Unique Leads', 'Duplicate Leads'],
-      datasets: [{
-        data: [unique, duplicates],
-        backgroundColor: ['#ed8f03', '#ffb75e'],
-        hoverOffset: 4
-      }]
+            const data = await response.json();
+            if (data.error) throw new Error(`Script error: ${JSON.stringify(data.error)}`);
+
+            // Assign data to our organized state object
+            this.masterData.push = data.push_data || [];
+            this.masterData.totalApplications = data.total_applications || [];
+            this.masterData.primaryApplications = data.primary_applications || [];
+            this.masterData.totalAdmissions = data.total_admissions || [];
+            this.masterData.primaryAdmissions = data.primary_admissions || [];
+
+            if (this.masterData.push.length === 0 && this.masterData.totalApplications.length === 0) {
+                throw new Error('All data sources returned empty.');
+            }
+
+            this.populateCollegeDropdown();
+            this.updateDashboardView();
+
+        } catch (error) {
+            console.error('Dashboard loading error:', error);
+            document.getElementById('total-push').innerText = 'Error';
+            document.getElementById('unique-push').innerText = 'Error';
+            document.querySelectorAll('.card[id]').forEach(card => this.hideLoader(card.id));
+        } finally {
+            if (refreshButton) {
+                refreshButton.textContent = 'Refresh Data';
+                refreshButton.disabled = false;
+            }
+        }
     },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: { legend: { position: 'top' } }
-    }
-  });
-}
-
-// --------- Push Trend Chart ---------
-function processAndRenderPushTrendChart(data) {
-  const grouped = {};
-
-  data.forEach(row => {
-    const date = row['Captured On'];
-    if (!date) return;
-    const mobile = (row['Mobile Number'] || '').replace(/\D/g, '');
-    if (!grouped[date]) grouped[date] = { total: 0, uniqueSet: new Set() };
-    grouped[date].total++;
-    if (mobile) grouped[date].uniqueSet.add(mobile);
-  });
-
-  const dates = Object.keys(grouped).sort((a, b) => new Date(a) - new Date(b));
-  const total = dates.map(d => grouped[d].total);
-  const unique = dates.map(d => grouped[d].uniqueSet.size);
-
-  const ctx = document.getElementById('pushTrendChart').getContext('2d');
-  if (window.pushTrendChart instanceof Chart) window.pushTrendChart.destroy();
-
-  window.pushTrendChart = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels: dates,
-      datasets: [
-        {
-          label: 'Total Pushes',
-          data: total,
-          borderColor: '#ed8f03',
-          backgroundColor: 'rgba(237,143,3,0.1)',
-          fill: true,
-          tension: 0.3
-        },
-        {
-          label: 'Unique Pushes',
-          data: unique,
-          borderColor: '#6a3d9a',
-          backgroundColor: 'rgba(106, 61, 154, 0.1)',
-          fill: true,
-          tension: 0.3
+    
+    updateDashboardView() {
+        const startDate = document.getElementById('start-date').value;
+        let endDate = document.getElementById('end-date').value;
+        const selectedCollege = document.getElementById('college-select').value;
+        
+        if (startDate && !endDate) {
+            endDate = new Date().toISOString().split('T')[0];
         }
-      ]
+
+        const dateFilter = (row, dateColumn) => (!startDate || row[dateColumn] >= startDate) && (!endDate || row[dateColumn] <= endDate);
+        const collegeFilter = (row, collegeColumn) => (selectedCollege === '__ALL__') || (row[collegeColumn] === selectedCollege);
+
+        // Filter master data into filteredData
+        this.filteredData.push = this.masterData.push.filter(row => dateFilter(row, 'Captured On') && collegeFilter(row, 'Opportunity: University Interested In'));
+        this.filteredData.totalApplications = this.masterData.totalApplications.filter(row => dateFilter(row, 'Date') && collegeFilter(row, 'college'));
+        this.filteredData.primaryApplications = this.masterData.primaryApplications.filter(row => dateFilter(row, 'Date') && collegeFilter(row, 'college'));
+        this.filteredData.totalAdmissions = this.masterData.totalAdmissions.filter(row => dateFilter(row, 'Date') && collegeFilter(row, 'college'));
+        this.filteredData.primaryAdmissions = this.masterData.primaryAdmissions.filter(row => dateFilter(row, 'Date') && collegeFilter(row, 'college'));
+
+        this.renderAll();
     },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      scales: {
-        y: { beginAtZero: true },
-        x: {
-          type: 'time',
-          time: { unit: 'day', tooltipFormat: 'dd/MM/yyyy' }
+
+    // =========================================================================
+    // RENDERING
+    // =========================================================================
+    renderAll() {
+        this.renderKPIs();
+        
+        this.renderUniversityChart(this.filteredData.push, 'leadsPushedChart', 'Opportunity: University Interested In');
+        this.renderUniversityChart(this.filteredData.primaryApplications, 'primaryAppsChart', 'college');
+        this.renderUniversityChart(this.filteredData.primaryAdmissions, 'primaryAdmissionsChart', 'college');
+        this.renderLeadCompositionChart(this.filteredData.push);
+        this.renderPushTrendChart(this.filteredData.push);
+        
+        this.hideLoader('payout-card');
+    },
+
+    renderKPIs() {
+        document.getElementById('total-push').innerText = this.filteredData.push.length;
+        document.getElementById('unique-push').innerText = this.getUniqueLeadCount(this.filteredData.push);
+        document.getElementById('total-apps').innerText = this.filteredData.totalApplications.length;
+        document.getElementById('primary-apps').innerText = this.filteredData.primaryApplications.length;
+        document.getElementById('total-admissions').innerText = this.filteredData.totalAdmissions.length;
+        document.getElementById('primary-admissions').innerText = this.filteredData.primaryAdmissions.length;
+
+        ['total-push-card', 'unique-push-card', 'total-apps-card', 'primary-apps-card', 'total-admissions-card', 'primary-admissions-card'].forEach(id => this.hideLoader(id));
+    },
+
+    renderUniversityChart(data, canvasId, collegeColumnName) {
+        const card = document.getElementById(canvasId)?.closest('.card');
+        if (!card) return;
+        const cardId = card.id;
+
+        setTimeout(() => {
+            const counts = data.reduce((acc, row) => {
+                const univ = row[collegeColumnName];
+                if (univ) acc[univ] = (acc[univ] || 0) + 1;
+                return acc;
+            }, {});
+
+            const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+            const labels = sorted.map(([k]) => k);
+            const values = sorted.map(([, v]) => v);
+
+            const canvas = document.getElementById(canvasId);
+            if (!canvas) return;
+            
+            const container = canvas.parentElement;
+            const ctx = canvas.getContext('2d');
+            
+            if (this.charts[canvasId] instanceof Chart) {
+                this.charts[canvasId].destroy();
+            }
+            
+            const containerWidth = container.clientWidth;
+            const barHeight = 30;
+            const newCanvasHeight = Math.max(300, labels.length * barHeight); 
+            
+            canvas.width = containerWidth;
+            canvas.height = newCanvasHeight;
+            canvas.style.width = `${containerWidth}px`;
+            canvas.style.height = `${newCanvasHeight}px`;
+
+            this.charts[canvasId] = new Chart(ctx, {
+                type: 'bar',
+                data: { labels, datasets: [{ data: values, backgroundColor: 'rgba(237, 143, 3, 0.7)', borderColor: 'rgba(237, 143, 3, 1)', borderWidth: 1, barThickness: 20 }] },
+                options: {
+                    indexAxis: 'y',
+                    responsive: false,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    layout: { padding: { left: 10, right: 20, top: 10, bottom: 10 } },
+                    scales: { x: { beginAtZero: true, ticks: { precision: 0 } }, y: { ticks: { autoSkip: false } } }
+                }
+            });
+            
+            this.hideLoader(cardId);
+        }, 100);
+    },
+
+    renderLeadCompositionChart(data) {
+        const cardId = 'leadCompositionChartCard';
+        this.hideLoader(cardId);
+        const unique = this.getUniqueLeadCount(data);
+        const duplicates = data.length - unique;
+
+        const canvas = document.getElementById('leadCompositionChart');
+        if (!canvas) return;
+        
+        if (this.charts.leadCompositionChart instanceof Chart) this.charts.leadCompositionChart.destroy();
+
+        this.charts.leadCompositionChart = new Chart(canvas.getContext('2d'), {
+            type: 'doughnut',
+            data: { labels: ['Unique Leads', 'Duplicate Leads'], datasets: [{ data: [unique, duplicates], backgroundColor: ['#ed8f03', '#ffb75e'], hoverOffset: 4 }] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' } } }
+        });
+    },
+
+    renderPushTrendChart(data) {
+        const cardId = 'pushTrendChartCard';
+        const grouped = {};
+        data.forEach(row => {
+            const date = row['Captured On'];
+            if (!date) return;
+            const mobile = (row['Mobile Number'] || '').replace(/\D/g, '');
+            if (!grouped[date]) grouped[date] = { total: 0, uniqueSet: new Set() };
+            grouped[date].total++;
+            if (mobile) grouped[date].uniqueSet.add(mobile);
+        });
+
+        const dates = Object.keys(grouped).sort((a, b) => new Date(a) - new Date(b));
+        const total = dates.map(d => grouped[d].total);
+        const unique = dates.map(d => grouped[d].uniqueSet.size);
+
+        const canvas = document.getElementById('pushTrendChart');
+        if (!canvas) return;
+
+        if (this.charts.pushTrendChart instanceof Chart) this.charts.pushTrendChart.destroy();
+
+        this.charts.pushTrendChart = new Chart(canvas.getContext('2d'), {
+            type: 'line',
+            data: { labels: dates, datasets: [{ label: 'Total Pushes', data: total, borderColor: '#ed8f03', backgroundColor: 'rgba(237,143,3,0.1)', fill: true, tension: 0.3 }, { label: 'Unique Pushes', data: unique, borderColor: '#6a3d9a', backgroundColor: 'rgba(106, 61, 154, 0.1)', fill: true, tension: 0.3 }] },
+            options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true }, x: { type: 'time', time: { unit: 'day', tooltipFormat: 'dd/MM/yyyy' } } }, plugins: { legend: { position: 'top' } } }
+        });
+        this.hideLoader(cardId);
+    },
+
+    // =========================================================================
+    // UI INTERACTION & HELPERS
+    // =========================================================================
+    showLoader(elementId) {
+        const overlay = document.querySelector(`#${elementId} .loading-overlay`);
+        if (overlay) overlay.classList.add('visible');
+    },
+
+    hideLoader(elementId) {
+        const overlay = document.querySelector(`#${elementId} .loading-overlay`);
+        if (overlay) overlay.classList.remove('visible');
+    },
+
+    populateCollegeDropdown() {
+        const collegeSelect = document.getElementById('college-select');
+        if (!collegeSelect) return;
+        const pushColleges = new Set(this.masterData.push.map(row => row['Opportunity: University Interested In']));
+        const appColleges = new Set(this.masterData.totalApplications.map(row => row.college));
+        const admissionColleges = new Set(this.masterData.totalAdmissions.map(row => row.college));
+        const allColleges = [...new Set([...pushColleges, ...appColleges, ...admissionColleges])];
+        const sortedColleges = allColleges.filter(Boolean).sort();
+        collegeSelect.innerHTML = '<option value="__ALL__">All Colleges</option>';
+        sortedColleges.forEach(name => {
+            const opt = document.createElement('option');
+            opt.value = name;
+            opt.textContent = name;
+            collegeSelect.appendChild(opt);
+        });
+    },
+
+    getUniqueLeadCount(data) {
+        const uniqueMobiles = new Set();
+        data.forEach(row => {
+            const mobile = (row['Mobile Number'] || '').toString().replace(/\D/g, '');
+            if (mobile) uniqueMobiles.add(mobile);
+        });
+        return uniqueMobiles.size;
+    },
+
+    setupClickableKpis() {
+    // This new config object tells us the data type AND which page to open.
+    const kpiConfig = {
+        'total-push-card':         { title: 'Total Pushed Leads',        dataType: 'push_total',           page: 'leads_details.html' },
+        'unique-push-card':        { title: 'Unique Pushed Leads',       dataType: 'push_unique',          page: 'leads_details.html' },
+        'total-apps-card':         { title: 'Total Applications',        dataType: 'total_applications',   page: 'details_page.html' },
+        'primary-apps-card':       { title: 'Primary Applications',      dataType: 'primary_applications', page: 'details_page.html' },
+        'total-admissions-card':   { title: 'Total Admissions',        dataType: 'total_admissions',     page: 'details_page.html' },
+        'primary-admissions-card': { title: 'Primary Admissions',      dataType: 'primary_admissions',   page: 'details_page.html' }
+    };
+
+    for (const cardId in kpiConfig) {
+        const card = document.getElementById(cardId);
+        if (card) {
+            card.classList.add('clickable');
+            // Pass the specific config for this card to the click handler
+            card.addEventListener('click', () => this.openDetailsPage(kpiConfig[cardId]));
         }
-      },
-      plugins: { legend: { position: 'top' } }
     }
-  });
-}
+},
+    
+    openDetailsPage(config) {
+    let dataToShow = [];
 
-/**
- * This function prepares the lead data and opens the new details page.
- * It decides whether to send all leads or only unique ones.
- */
-function showLeadDetails(dataType) {
-  let dataToShow = [];
+    // Helper for getting unique records based on Mobile Number
+    let getUniqueItems = (data, key) => {
+        const uniqueKeys = new Set();
+        return data.filter(row => {
+            const value = (row[key] || '').toString().replace(/\D/g, '');
+            if (value && !uniqueKeys.has(value)) {
+                uniqueKeys.add(value);
+                return true;
+            }
+            return false;
+        });
+    };
 
-  // These are the only columns we need for the new page.
-  const requiredColumns = [
-    'Name', 
-    'Email Address', 
-    'Mobile Number', 
-    'Captured On', 
-    'Opportunity: University Interested In', 
-    'Opportunity: Course Interested In', 
-    'Specialization'
-  ];
-
-  // First, we simplify our data to only include the columns we need.
-  const relevantData = currentlyFilteredData.map(fullRow => {
-    let newRow = {};
-    for (const col of requiredColumns) {
-      newRow[col] = fullRow[col] || ''; // Use an empty string if data is missing
+    // Select the correct dataset based on the dataType from the config
+    switch (config.dataType) {
+        case 'push_total':           dataToShow = this.filteredData.push; break;
+        case 'push_unique':          dataToShow = getUniqueItems(this.filteredData.push, 'Mobile Number'); break;
+        case 'total_applications':   dataToShow = this.filteredData.totalApplications; break;
+        case 'primary_applications': dataToShow = this.filteredData.primaryApplications; break;
+        case 'total_admissions':     dataToShow = this.filteredData.totalAdmissions; break;
+        case 'primary_admissions':   dataToShow = this.filteredData.primaryAdmissions; break;
     }
-    return newRow;
-  });
+    
+    // If we have data, store it and the title in sessionStorage, then open the correct page
+    if (dataToShow.length > 0) {
+        const headers = Object.keys(dataToShow[0]);
+        // Normalize data to ensure all objects have the same keys, preventing errors
+        const normalizedData = dataToShow.map(row => {
+            let newRow = {};
+            headers.forEach(header => newRow[header] = row[header] || ''); // Use empty string for null/undefined values
+            return newRow;
+        });
 
-  // If the user clicked "Unique Push", we filter out the duplicates.
-  if (dataType === 'unique') {
-    const uniqueMobiles = new Set(); // A set only allows unique values
-    dataToShow = relevantData.filter(row => {
-      const mobile = row['Mobile Number'].replace(/\D/g, '');
-      if (mobile && !uniqueMobiles.has(mobile)) {
-        uniqueMobiles.add(mobile); // Add the mobile number to the set
-        return true; // Keep this row
-      }
-      return false; // Skip this duplicate row
+        sessionStorage.setItem('detailsData', JSON.stringify(normalizedData));
+        sessionStorage.setItem('detailsTitle', config.title); // Store the title for the new page
+        
+        window.open(config.page, '_blank'); // Open the page specified in the config
+    } else {
+        alert('No data to show for this selection.');
+    }
+},
+    openChartModal(originalChart) {
+    const modal = document.getElementById('chartModal');
+    const container = document.getElementById('modalChartContainer');
+    if (!modal || !container) return;
+
+    container.innerHTML = ''; // Clear previous chart
+    modal.classList.add('open');
+    document.body.classList.add('modal-open');
+
+    const canvas = document.createElement('canvas');
+    container.appendChild(canvas);
+
+    if (this.modalChart) {
+        this.modalChart.destroy();
+    }
+
+    const newOptions = JSON.parse(JSON.stringify(originalChart.config.options));
+    
+    // =====================================================================
+    // NEW: Conditional logic based on chart type
+    // =====================================================================
+
+    // IF it's a horizontal bar chart, make it tall and scrollable
+    if (originalChart.config.type === 'bar' && newOptions.indexAxis === 'y') {
+        
+        const containerWidth = container.clientWidth;
+        const barHeight = 35; // Give bars more space in the modal
+        const verticalPadding = 50;
+        const newCanvasHeight = (originalChart.data.labels.length * barHeight) + verticalPadding;
+
+        // Set the canvas element's actual render size
+        canvas.width = containerWidth;
+        canvas.height = newCanvasHeight;
+
+        // Ensure it's NOT responsive so it doesn't shrink
+        newOptions.responsive = false;
+        newOptions.maintainAspectRatio = false;
+
+        // Hide legend for single-series bar charts
+        if (newOptions.plugins && newOptions.plugins.legend) {
+            newOptions.plugins.legend.display = false;
+        }
+
+    } 
+    // ELSE (for line charts, etc.), make it fit the container perfectly
+    else {
+        
+        // Ensure it IS responsive to fit the modal
+        newOptions.responsive = true;
+        newOptions.maintainAspectRatio = false; // Allow it to fill the space
+
+        // Make sure the legend is visible for line charts
+        if (newOptions.plugins && newOptions.plugins.legend) {
+            newOptions.plugins.legend.display = true;
+        }
+    }
+    
+    // Create the new chart with the conditionally set options
+    this.modalChart = new Chart(canvas.getContext('2d'), {
+        type: originalChart.config.type,
+        data: JSON.parse(JSON.stringify(originalChart.data)),
+        options: newOptions
     });
-  } else {
-    // If the user clicked "Total Push", we use all the relevant data.
-    dataToShow = relevantData;
-  }
+},
 
-  // IMPORTANT: We store the data in the browser's temporary memory (sessionStorage)
-  // so the new page can access it. Think of it like a temporary sticky note.
-  sessionStorage.setItem('leadsData', JSON.stringify(dataToShow));
+    closeChartModal() {
+        const modal = document.getElementById('chartModal');
+        if (!modal) return;
+        
+        if (this.modalChart) {
+            this.modalChart.destroy();
+            this.modalChart = null;
+        }
+        modal.classList.remove('open');
+        document.body.classList.remove('modal-open');
+    },
 
-  // Finally, we open the new page in a new tab.
-  window.open('leads_details.html', '_blank');
-}
+    // Paste this entire function inside your DashboardApp object
+exportMasterReport() {
+    console.log("Master report export started...");
 
-// --------- Modal Chart Logic (with scroll enhancement) ---------
-function setupModalListeners() {
-  const modal = document.getElementById('chartModal');
-  const closeBtn = document.querySelector('.modal-close-btn');
-  const expandBtns = document.querySelectorAll('.expand-btn');
+    // 1. Get a unique, sorted list of all colleges from the current filtered data
+    const pushColleges = new Set(this.filteredData.push.map(row => row['Opportunity: University Interested In']));
+    const appColleges = new Set(this.filteredData.totalApplications.map(row => row.college));
+    const admissionColleges = new Set(this.filteredData.totalAdmissions.map(row => row.college));
+    const allColleges = [...new Set([...pushColleges, ...appColleges, ...admissionColleges])].filter(Boolean).sort();
 
-  expandBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-      const chartId = btn.dataset.chartId;
-      const chartInstance = window[chartId];
-      if (chartInstance) openChartModal(chartInstance);
-      else alert('Chart is not available.');
-    });
-  });
-
-  closeBtn.addEventListener('click', closeChartModal);
-  modal.addEventListener('click', e => {
-    if (e.target === modal) closeChartModal();
-  });
-}
-
-function openChartModal(originalChart) {
-  const modal = document.getElementById('chartModal');
-  const container = document.getElementById('modalChartContainer');
-  container.innerHTML = ''; // Clear previous chart
-
-  // --- Start of The Final Fix ---
-
-  // 1. MAKE THE MODAL VISIBLE FIRST
-  // This allows the browser to render the modal and give its children real dimensions.
-  modal.classList.add('open');
-  document.body.classList.add('modal-open');
-
-  // 2. NOW that the modal is visible, create the canvas and measure its container
-  const canvas = document.createElement('canvas');
-  canvas.id = 'modalCanvas';
-  container.appendChild(canvas);
-
-  const containerWidth = container.clientWidth; // This will now return the correct width
-  let newCanvasHeight = 500; // A sensible default height
-
-  if (originalChart.config.type === 'bar' && originalChart.config.options.indexAxis === 'y') {
-    const barHeight = 35;
-    const verticalPadding = 50;
-    newCanvasHeight = (originalChart.data.labels.length * barHeight) + verticalPadding;
-  }
-  
-  // 3. APPLY the measured dimensions and create the chart
-  canvas.width = containerWidth;
-  canvas.height = newCanvasHeight;
-  canvas.style.width = `${containerWidth}px`;
-  canvas.style.height = `${newCanvasHeight}px`;
-
-  const ctx = canvas.getContext('2d');
-  if (modalChart) {
-    modalChart.destroy();
-  }
-
-  // Create the chart with direct dimensions, disabling the problematic responsive logic
-  modalChart = new Chart(ctx, {
-    type: originalChart.config.type,
-    data: JSON.parse(JSON.stringify(originalChart.data)),
-    options: {
-      ...originalChart.config.options,
-      responsive: false, // Keep this false for direct control
-      maintainAspectRatio: false
+    if (allColleges.length === 0) {
+        alert("No data available to export for the selected filters.");
+        return;
     }
-  });
-}
 
-function closeChartModal() {
-  const modal = document.getElementById('chartModal');
-  if (modalChart) {
-    modalChart.destroy();
-    modalChart = null;
-  }
-  modal.classList.remove('open');
-  document.body.classList.remove('modal-open');
-}
+    const reportData = [];
+    // 2. For each college, calculate all the required metrics
+    for (const collegeName of allColleges) {
+        // Filter each dataset for the current college
+        const leadsForCollege = this.filteredData.push.filter(row => row['Opportunity: University Interested In'] === collegeName);
+        const totalAppsForCollege = this.filteredData.totalApplications.filter(row => row.college === collegeName);
+        const primaryAppsForCollege = this.filteredData.primaryApplications.filter(row => row.college === collegeName);
+        const totalAdmissionsForCollege = this.filteredData.totalAdmissions.filter(row => row.college === collegeName);
+        const primaryAdmissionsForCollege = this.filteredData.primaryAdmissions.filter(row => row.college === collegeName);
+
+        // Add the calculated row to our report data
+        reportData.push({
+            'College Name': collegeName,
+            'Total Leads Pushed': leadsForCollege.length,
+            'Unique Leads Pushed': this.getUniqueLeadCount(leadsForCollege), // Reusing our helper!
+            'Total Applications': totalAppsForCollege.length,
+            'Primary Applications': primaryAppsForCollege.length,
+            'Total Admissions': totalAdmissionsForCollege.length,
+            'Primary Admissions': primaryAdmissionsForCollege.length,
+        });
+    }
+
+    // 3. Convert the report data to a CSV string and trigger the download
+    const headers = Object.keys(reportData[0]);
+    const csvRows = [headers.join(',')]; // CSV Header row
+
+    for (const row of reportData) {
+        const values = headers.map(header => {
+            const value = row[header];
+            const escaped = ('' + value).replace(/"/g, '""'); // Handle quotes
+            return `"${escaped}"`;
+        });
+        csvRows.push(values.join(','));
+    }
+
+    const csvString = csvRows.join('\n');
+    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    
+    const today = new Date().toISOString().slice(0, 10);
+    a.href = url;
+    a.download = `master_report_${today}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    console.log("Master report export finished.");
+}, // Don't forget the comma here!
+
+// Paste this entire function inside your DashboardApp object
+// Replace your existing exportDayWisePushReport function with this new version
+exportDayWisePushReport() {
+    console.log("Pivoted day-wise push report export started...");
+
+    const pushData = this.filteredData.push;
+
+    if (pushData.length === 0) {
+        alert("No push data available to export for the selected filters.");
+        return;
+    }
+
+    // 1. Get all unique colleges and unique dates from the filtered data
+    const colleges = new Set();
+    const dates = new Set();
+    pushData.forEach(row => {
+        if (row['Opportunity: University Interested In']) {
+            colleges.add(row['Opportunity: University Interested In']);
+        }
+        if (row['Captured On']) {
+            dates.add(row['Captured On']);
+        }
+    });
+
+    // Convert sets to sorted arrays for consistent ordering
+    const sortedColleges = [...colleges].sort();
+    const sortedDates = [...dates].sort((a, b) => new Date(a) - new Date(b));
+
+    if (sortedColleges.length === 0 || sortedDates.length === 0) {
+        alert("Data is missing college names or dates, cannot generate report.");
+        return;
+    }
+
+    // 2. Create a pivot data structure to hold the counts: { 'CollegeName': { 'YYYY-MM-DD': count } }
+    const pivotData = {};
+    for (const row of pushData) {
+        const collegeName = row['Opportunity: University Interested In'];
+        const date = row['Captured On'];
+
+        if (!collegeName || !date) continue;
+
+        // Initialize nested objects if they don't exist
+        if (!pivotData[collegeName]) {
+            pivotData[collegeName] = {};
+        }
+        if (!pivotData[collegeName][date]) {
+            pivotData[collegeName][date] = 0;
+        }
+
+        pivotData[collegeName][date]++;
+    }
+
+    // 3. Transform the pivot data into an array of rows for the CSV
+    const reportData = [];
+    for (const collegeName of sortedColleges) {
+        const rowObject = { 'College Name': collegeName };
+        for (const date of sortedDates) {
+            // Use the date string as the key for the column
+            // Get the count from our pivot map, defaulting to 0 if none exists for that day
+            const count = pivotData[collegeName]?.[date] || 0;
+            rowObject[date] = count;
+        }
+        reportData.push(rowObject);
+    }
+
+    // 4. Generate and download the CSV file (this logic remains the same)
+    const headers = Object.keys(reportData[0]);
+    const csvRows = [headers.join(',')];
+
+    for (const row of reportData) {
+        const values = headers.map(header => {
+            const value = row[header];
+            const escaped = ('' + value).replace(/"/g, '""');
+            return `"${escaped}"`;
+        });
+        csvRows.push(values.join(','));
+    }
+
+    const csvString = csvRows.join('\n');
+    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    
+    const today = new Date().toISOString().slice(0, 10);
+    a.href = url;
+    a.download = `day_wise_pivot_report_${today}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    console.log("Pivoted day-wise push report export finished.");
+},
+};
+
+// Initialize the application
+DashboardApp.init();
+
 </script>
 
 </body>
